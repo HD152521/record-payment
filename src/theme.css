@@ -1,0 +1,100 @@
+/* 방향: 종이 가계부 + 영수증. 따뜻한 종이 바탕, 먹색 글씨, 숫자는 고정폭. 색은 유형 구분에만 쓴다. */
+:root {
+  --paper: #f5f0e6;
+  --paper-raised: #fbf8f1;
+  --ink: #1e1b16;
+  --ink-soft: #6b6458;
+  --rule: #d9d0bf;
+  --rule-strong: #1e1b16;
+
+  --kind-subscription: #2f3e9e;
+  --kind-one-time: #5b5549;
+  --kind-card: #9a5b00;
+  --kind-unknown: #8a8275;
+  --trial: #2e7d4f;
+  --danger: #b3261e;
+
+  --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", D2Coding, ui-monospace, Consolas, monospace;
+
+  --radius: 6px;
+  --shadow: 0 1px 0 rgb(30 27 22 / 0.06), 0 8px 24px -12px rgb(30 27 22 / 0.25);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration: 160ms;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #17150f;
+    --paper-raised: #211e17;
+    --ink: #efe8da;
+    --ink-soft: #a39a89;
+    --rule: #3a352a;
+    --rule-strong: #efe8da;
+    --kind-subscription: #9fabff;
+    --kind-one-time: #c9c0ae;
+    --kind-card: #f0b45a;
+    --kind-unknown: #8f8777;
+    --trial: #7fd4a0;
+    --danger: #ff8a80;
+    --shadow: 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.muted { color: var(--ink-soft); }
+
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-right: 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kind-subscription { color: var(--kind-subscription); }
+.kind-one_time { color: var(--kind-one-time); }
+.kind-card_registered { color: var(--kind-card); }
+.kind-unknown { color: var(--kind-unknown); border-style: dashed; }
+.badge.trial { color: var(--trial); }
+.badge.canceled { color: var(--ink-soft); }
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  transition: transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 3px 0 var(--rule); }
+.btn:active { transform: translateY(1px); box-shadow: none; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+:focus-visible { outline: 2px solid var(--kind-subscription); outline-offset: 2px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "payment-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "결제수단 등록·구독을 자동으로 기록하는 크롬 확장프로그램",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

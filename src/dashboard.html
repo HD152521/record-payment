@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>결제 기록장</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="cloud.css">
+  <link rel="stylesheet" href="picker.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="headline">
+      <p class="eyebrow">결제 기록장 · 매달 나가는 구독료 (원화 환산)</p>
+      <p class="total" id="monthly-total">0원</p>
+      <p class="total-sub" id="yearly-total"></p>
+      <p class="total-sub" id="all-total"></p>
+    </div>
+    <dl class="stats" id="stats"></dl>
+  </header>
+
+  <section class="cloud" aria-labelledby="cloud-h">
+    <div class="cloud-head">
+      <div>
+        <h2 id="cloud-h" class="eyebrow">서버·API · 이번 달 사용료</h2>
+        <p class="cloud-total" id="cloud-total">0원</p>
+        <p class="cloud-sub" id="cloud-sub"></p>
+      </div>
+      <div class="toolbar">
+        <span class="muted cloud-updated" id="cloud-updated" role="status"></span>
+        <button type="button" class="btn ghost" id="cloud-refresh">지금 갱신</button>
+        <button type="button" class="btn" id="cloud-add">연결 추가</button>
+      </div>
+    </div>
+    <ul class="cloud-accounts" id="cloud-accounts"></ul>
+    <p class="empty" id="cloud-empty" hidden>AWS · Azure · OpenAI · Cloudflare · GitHub · Vercel을 연결하면 매일 아침 이번 달 사용료를 가져와요. 키는 이 브라우저에만 저장돼요.</p>
+  </section>
+
+  <main>
+    <aside class="side">
+      <section class="upcoming" aria-labelledby="upcoming-h">
+        <h2 id="upcoming-h">30일 안에 결제 예정</h2>
+        <ol class="receipt" id="upcoming-list"></ol>
+        <p class="muted" id="upcoming-empty" hidden>예정된 구독 결제가 없어요.</p>
+      </section>
+
+      <section class="cards" aria-labelledby="cards-h">
+        <div class="cards-head">
+          <h2 id="cards-h">내 카드</h2>
+          <button type="button" class="btn ghost small" id="card-add">카드 등록</button>
+        </div>
+        <ul class="card-list" id="card-list"></ul>
+        <p class="muted" id="card-empty" hidden>카드를 등록해 두면 기록을 추가할 때 고르기만 하면 돼요. 끝 4자리만 저장해요.</p>
+      </section>
+    </aside>
+
+    <section class="ledger" aria-labelledby="ledger-h">
+      <div class="ledger-head">
+        <h2 id="ledger-h">전체 기록</h2>
+        <div class="toolbar">
+          <div class="filters" id="filters" role="group" aria-label="유형 필터">
+            <button type="button" data-filter="all">전체</button>
+            <button type="button" data-filter="subscription">구독</button>
+            <button type="button" data-filter="one_time">일회성</button>
+            <button type="button" data-filter="card_registered">결제수단 등록</button>
+            <button type="button" data-filter="unknown">미확인</button>
+          </div>
+          <button type="button" class="btn" id="add-btn">추가</button>
+          <button type="button" class="btn ghost" id="csv-btn">CSV 내보내기</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>사이트</th><th>유형</th><th class="num">금액</th><th>카드 · 결제대행</th><th>시작일</th><th><span class="sr-only">수정</span></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="empty" hidden>아직 기록이 없어요. 결제하거나 카드를 등록하면 여기에 자동으로 쌓여요.</p>
+    </section>
+  </main>
+
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="editor-form" method="dialog">
+      <h2 id="editor-title">기록 수정</h2>
+      <label>사이트<input name="site" required maxlength="120" placeholder="netflix.com"></label>
+      <label id="plan-row" hidden>요금제
+        <select name="plan"></select>
+        <small class="hint" id="plan-hint"></small>
+      </label>
+      <div class="row">
+        <label>유형
+          <select name="kind">
+            <option value="subscription">구독</option><option value="one_time">일회성</option>
+            <option value="card_registered">결제수단 등록</option><option value="unknown">미확인</option>
+          </select>
+        </label>
+        <label>주기
+          <select name="cycle">
+            <option value="">없음</option><option value="monthly">매월</option>
+            <option value="yearly">매년</option><option value="weekly">매주</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>금액<input name="amount" type="number" min="0" step="any" inputmode="decimal"></label>
+        <label>통화
+          <select name="currency"><option value="KRW">원</option><option value="USD">달러</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>결제 카드<select name="cardKey"></select></label>
+        <label id="last4-row" hidden>카드 끝 4자리<input name="last4" pattern="\d{4}" maxlength="4" inputmode="numeric"></label>
+      </div>
+      <div class="row">
+        <label>결제대행<input name="pg" maxlength="40"></label>
+      </div>
+      <div class="row">
+        <label>시작일<input name="startedAt" type="date" required></label>
+        <label>상태
+          <select name="status"><option value="active">사용중</option><option value="canceled">해지함</option></select>
+        </label>
+      </div>
+      <label class="check"><input name="trial" type="checkbox"> 무료 체험 중</label>
+      <label>메모<input name="note" maxlength="200"></label>
+      <p class="evidence muted" id="editor-evidence"></p>
+      <div class="actions">
+        <button type="button" class="btn danger" id="delete-btn">삭제</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="cancel-btn">취소</button>
+        <button type="submit" class="btn">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="picker" aria-labelledby="picker-title">
+    <form id="picker-form" method="dialog">
+      <h2 id="picker-title">무엇을 추가할까요?</h2>
+      <label><span class="sr-only">검색</span><input name="q" type="search" placeholder="넷플릭스, AWS, Cursor…" autocomplete="off"></label>
+      <div class="chips" id="picker-cats" role="group" aria-label="분류"></div>
+      <ul class="picker-list" id="picker-list"></ul>
+      <p class="muted" id="picker-empty" hidden>목록에 없어요. 아래 "직접 입력"으로 추가해 주세요.</p>
+      <p class="hint" id="picker-asof"></p>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="picker-manual">직접 입력</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="picker-cancel">닫기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="card-dialog" aria-labelledby="card-dialog-title">
+    <form id="card-form" method="dialog">
+      <h2 id="card-dialog-title">카드 등록</h2>
+      <label><span>별명 <span class="muted">— 예: 신한 법인카드</span></span><input name="label" maxlength="30" autocomplete="off"></label>
+      <div class="row">
+        <label>종류
+          <select name="brand">
+            <option>Visa</option><option>Mastercard</option><option>AMEX</option><option>JCB</option>
+            <option>UnionPay</option><option value="국내 카드">국내 전용</option><option value="체크카드">체크카드</option>
+          </select>
+        </label>
+        <label>끝 4자리<input name="last4" required pattern="\d{4}" maxlength="4" inputmode="numeric" autocomplete="off"></label>
+      </div>
+      <p class="hint">카드번호 전체·유효기간·CVC는 받지 않아요. 기록과 짝지을 끝 4자리만 이 브라우저에 저장해요.</p>
+      <div class="actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="card-cancel">취소</button>
+        <button type="submit" class="btn">등록</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cloud-dialog" aria-labelledby="cloud-dialog-title">
+    <form id="cloud-form" method="dialog">
+      <h2 id="cloud-dialog-title">사용료 연결</h2>
+      <div class="segmented" role="radiogroup" aria-label="서비스">
+        <label><input type="radio" name="provider" value="aws" checked> AWS</label>
+        <label><input type="radio" name="provider" value="azure"> Azure</label>
+        <label><input type="radio" name="provider" value="openai"> OpenAI</label>
+        <label><input type="radio" name="provider" value="cloudflare"> Cloudflare</label>
+        <label><input type="radio" name="provider" value="github"> GitHub</label>
+        <label><input type="radio" name="provider" value="vercel"> Vercel</label>
+      </div>
+
+      <fieldset data-panel="aws">
+        <legend class="sr-only">AWS 연결</legend>
+        <ol class="steps">
+          <li><a href="https://console.aws.amazon.com/iam/home#/users/create" target="_blank" rel="noopener">IAM 콘솔에서 사용자 만들기</a> — 이름은 <code>cost-reader</code>처럼, 콘솔 접근은 끈 채로.</li>
+          <li>권한 설정에서 <b>정책 직접 연결 → 정책 생성 → JSON</b>에 아래를 붙여 넣어요. 비용 조회만 되는 권한이에요.
+            <div class="code-copy"><pre id="aws-policy"></pre><button type="button" class="btn ghost small" id="aws-policy-copy">복사</button></div>
+          </li>
+          <li>만든 사용자 → <b>보안 자격 증명 → 액세스 키 만들기</b> → "AWS 외부에서 실행되는 애플리케이션".</li>
+          <li>나온 두 값을 아래에 붙여 넣어요. <b>평소 쓰는 관리자 키는 넣지 마세요.</b> 이 확장은 키 권한을 확인하지 못해서, 위 정책만 붙은 전용 사용자 키여야 안전해요.</li>
+        </ol>
+        <label>액세스 키 ID<input name="accessKeyId" required autocomplete="off" spellcheck="false" placeholder="AKIA..."></label>
+        <label>비밀 액세스 키<input name="secretAccessKey" type="password" required autocomplete="new-password"></label>
+        <p class="hint">하루 한 번 조회해요. AWS가 조회 1번에 $0.01을 받아서 한 달 약 $0.30이에요. Cost Explorer를 처음 켰다면 데이터가 쌓이기까지 최대 24시간 걸려요.</p>
+      </fieldset>
+
+      <fieldset data-panel="azure" hidden disabled>
+        <legend class="sr-only">Azure 연결</legend>
+        <ol class="steps">
+          <li>아래 버튼으로 Azure를 쓰는 Microsoft 계정에 로그인하고 <b>허용</b>을 눌러요.</li>
+          <li>구독에 <b>Cost Management 읽기 권한자</b> 이상의 역할이 있어야 비용이 보여요. 구독 소유자라면 이미 있어요.</li>
+          <li>Azure에는 "비용만 읽기" 로그인 권한이 따로 없어서, 저장되는 로그인 토큰은 내 Azure 권한을 그대로 가져요. 이 확장은 비용 조회만 하지만, 공용 PC에서는 연결하지 마세요.</li>
+        </ol>
+        <label><span>디렉터리(테넌트) ID <span class="muted">— 모르면 비워 두세요</span></span><input name="tenant" autocomplete="off" spellcheck="false" placeholder="개인 계정이라 로그인이 안 되면 여기에 입력"></label>
+        <p class="hint" id="azure-missing" hidden>이 설치본에는 Azure 앱 ID가 아직 없어요. 배포자가 README의 "Azure 앱 등록"을 마치면 쓸 수 있어요.</p>
+      </fieldset>
+
+      <fieldset data-panel="openai" hidden disabled>
+        <legend class="sr-only">OpenAI 연결</legend>
+        <ol class="steps">
+          <li><a href="https://platform.openai.com/settings/organization/admin-keys" target="_blank" rel="noopener">조직 설정 → Admin keys</a>에서 <b>Create new admin key</b>. 조직 Owner만 만들 수 있어요.</li>
+          <li>권한을 고를 수 있으면 <b>읽기 전용</b>으로 만들어요. 관리자 키는 조직의 키·멤버까지 관리할 수 있을 만큼 권한이 넓어요. 이 브라우저에만 저장하고 OpenAI 말고는 어디에도 보내지 않지만, 공용 PC에서는 연결하지 마세요.</li>
+          <li>키를 아래에 붙여 넣어요.</li>
+        </ol>
+        <label>관리자 키<input name="adminKey" type="password" required autocomplete="new-password" placeholder="sk-admin-..."></label>
+      </fieldset>
+
+      <fieldset data-panel="cloudflare" hidden disabled>
+        <legend class="sr-only">Cloudflare 연결</legend>
+        <ol class="steps">
+          <li><a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">API 토큰 화면</a> → <b>Create Token → Custom token</b>.</li>
+          <li>권한은 <b>Account · Billing · Read</b> 하나만 넣어요. 청구 내역만 볼 수 있는 토큰이에요.</li>
+          <li>만든 토큰을 아래에 붙여 넣어요. 계정이 여러 개면 계정 ID도 넣어요(대시보드 주소 <code>dash.cloudflare.com/계정ID</code>).</li>
+        </ol>
+        <label>API 토큰<input name="cfToken" type="password" required autocomplete="new-password" spellcheck="false"></label>
+        <label><span>계정 ID <span class="muted">— 선택</span></span><input name="cfAccountId" autocomplete="off" spellcheck="false" maxlength="32"></label>
+        <p class="hint">Cloudflare는 한 달에 한 번 청구돼서, 월말 예상은 지난달 청구액 기준으로 보여 줘요.</p>
+      </fieldset>
+
+      <fieldset data-panel="github" hidden disabled>
+        <legend class="sr-only">GitHub 연결</legend>
+        <ol class="steps">
+          <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Fine-grained 토큰 만들기</a> → Account permissions에서 <b>Plan: Read-only</b>만 켜요. 저장소 권한은 없어도 돼요.</li>
+          <li>조직 비용을 보려면 조직 이름을 넣어요. 그 조직의 관리자여야 해요.</li>
+          <li>GitHub의 새 청구 플랫폼을 쓰는 계정에서만 읽혀요. 안 되면 아래 "요금제로 직접 기록"을 써 주세요.</li>
+        </ol>
+        <label>토큰<input name="ghToken" type="password" required autocomplete="new-password" spellcheck="false" placeholder="github_pat_..."></label>
+        <label><span>조직 이름 <span class="muted">— 선택</span></span><input name="ghOrg" autocomplete="off" spellcheck="false" maxlength="39"></label>
+      </fieldset>
+
+      <fieldset data-panel="vercel" hidden disabled>
+        <legend class="sr-only">Vercel 연결</legend>
+        <ol class="steps">
+          <li><a href="https://vercel.com/account/settings/tokens" target="_blank" rel="noopener">Account Settings → Tokens</a>에서 토큰을 만들어요. Scope는 비용을 볼 팀으로, 만료일도 정해 두세요.</li>
+          <li>Vercel에는 읽기 전용 토큰이 없어서 이 토큰은 그 팀을 다룰 수 있어요. 이 확장은 청구 조회만 하지만 공용 PC에서는 연결하지 마세요.</li>
+          <li>팀에서 Owner·Billing처럼 청구를 볼 수 있는 역할이어야 해요.</li>
+        </ol>
+        <label>토큰<input name="vcToken" type="password" required autocomplete="new-password" spellcheck="false"></label>
+        <label><span>팀 ID 또는 주소 <span class="muted">— 선택, 비우면 모든 팀</span></span><input name="vcTeam" autocomplete="off" spellcheck="false" maxlength="64"></label>
+      </fieldset>
+
+      <p class="hint" id="cloud-manual-row" hidden>API로 안 되면 <button type="button" class="link" id="cloud-manual">요금제로 직접 기록</button>할 수 있어요.</p>
+
+      <label><span>이름 <span class="muted">— 선택, 예: 회사 AWS</span></span><input name="label" maxlength="60" autocomplete="off"></label>
+      <p class="status" id="cloud-status" role="status"></p>
+      <div class="actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" id="cloud-cancel">취소</button>
+        <button type="submit" class="btn" id="cloud-submit">연결 확인</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="lib/detect.js"></script>
+  <script src="lib/ledger.js"></script>
+  <script src="lib/store.js"></script>
+  <script src="lib/catalog.js"></script>
+  <script src="ui.js"></script>
+  <script src="lib/cloud/config.js"></script>
+  <script src="lib/cloud/costs.js"></script>
+  <script src="lib/cloud/sigv4.js"></script>
+  <script src="lib/cloud/aws.js"></script>
+  <script src="lib/cloud/azure.js"></script>
+  <script src="lib/cloud/openai.js"></script>
+  <script src="lib/cloud/cloudflare.js"></script>
+  <script src="lib/cloud/github.js"></script>
+  <script src="lib/cloud/vercel.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="cloud-ui.js"></script>
+  <script src="picker.js"></script>
+</body>
+</html>

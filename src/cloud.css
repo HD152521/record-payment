@@ -1,0 +1,110 @@
+/* 클라우드 칸: 가계부 위에 붙은 "공과금 고지서" 묶음. 서비스 색은 카드 왼쪽 띠에만 쓴다. */
+:root {
+  --cloud: #0f6b5c;
+  --provider-aws: #b35c00;
+  --provider-azure: #1f5fbf;
+  --provider-openai: #2b2b2b;
+  --provider-cloudflare: #c2410c;
+  --provider-github: #24292f;
+  --provider-vercel: #000000;
+  --warn: #8a5a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cloud: #6fd3bd;
+    --provider-aws: #ffad5c;
+    --provider-azure: #8db8ff;
+    --provider-openai: #d8d2c4;
+    --provider-cloudflare: #fb923c;
+    --provider-github: #c9d1d9;
+    --provider-vercel: #ededed;
+    --warn: #f0c36a;
+  }
+}
+
+.cloud { padding: 28px 0 32px; border-bottom: 3px double var(--rule-strong); }
+.cloud-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 20px; }
+.cloud-head h2 { margin: 0; }
+.cloud-total {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--cloud);
+  font-variant-numeric: tabular-nums;
+}
+.cloud-sub { margin: 8px 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); }
+.cloud-updated { font-size: 12px; }
+.btn:disabled { opacity: 0.5; cursor: progress; transform: none; box-shadow: none; }
+.btn.small { padding: 3px 10px; font-size: 12px; }
+
+.cloud-accounts {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
+}
+.cloud-card {
+  --accent: var(--ink-soft);
+  position: relative;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 16px 12px 20px;
+  background: var(--paper-raised);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: transform var(--duration) var(--ease);
+}
+.cloud-card::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
+  border-radius: var(--radius) 0 0 var(--radius); background: var(--accent);
+}
+.cloud-card:hover { transform: translateY(-2px); }
+.provider-aws { --accent: var(--provider-aws); }
+.provider-azure { --accent: var(--provider-azure); }
+.provider-openai { --accent: var(--provider-openai); }
+.provider-cloudflare { --accent: var(--provider-cloudflare); }
+.provider-github { --accent: var(--provider-github); }
+.provider-vercel { --accent: var(--provider-vercel); }
+.cloud-card header { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.badge.provider { color: var(--accent); }
+.cloud-label { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-mtd { margin: 0; font-family: var(--font-mono); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cloud-mtd small, .figures small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 8px 0; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); }
+.figures dt { font-size: 12px; color: var(--ink-soft); }
+.figures dd { margin: 0; font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+.figures small { display: block; margin: 0; }
+.cloud-card .receipt li { padding: 4px 0; font-size: 13px; }
+.cloud-card footer { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-top: auto; }
+.cloud-card .error, .status.error { margin: 0; color: var(--danger); font-size: 13px; }
+.cloud-card .warn { margin: 0; color: var(--warn); font-size: 12px; }
+.cloud-card.has-error { outline: 1.5px dashed var(--danger); outline-offset: -1.5px; }
+.cloud .empty { padding: 24px 0 8px; }
+
+/* 연결 대화상자 */
+#cloud-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+#cloud-dialog fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+/* 서비스가 6개라 3칸씩 두 줄. 칸 사이 선은 gap 1px 위로 비치는 바탕색으로 그린다. */
+.segmented {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--rule); border: 1.5px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+}
+.segmented label { flex-direction: row; justify-content: center; margin: 0; padding: 7px 0; cursor: pointer; font-size: 14px; background: var(--paper-raised); }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label:has(input:checked) { background: var(--ink); color: var(--paper); }
+.segmented label:has(input:focus-visible) { outline: 2px solid var(--kind-subscription); outline-offset: -3px; }
+.segmented label:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+.steps { margin: 0 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+.steps li { margin-bottom: 6px; }
+.steps a { color: var(--kind-subscription); }
+.steps code { font-family: var(--font-mono); font-size: 12px; }
+.code-copy { position: relative; margin-top: 6px; }
+.code-copy pre {
+  margin: 0; padding: 10px 12px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.45;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius);
+}
+.code-copy .btn { position: absolute; top: 6px; right: 6px; }
+#cloud-dialog label .muted { font-weight: 400; }
+.hint { margin: 0 0 12px; font-size: 12px; color: var(--ink-soft); }
+.status { min-height: 1.2em; margin: 0 0 12px; font-size: 13px; color: var(--ink-soft); }

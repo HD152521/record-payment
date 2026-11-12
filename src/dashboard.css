@@ -1,0 +1,105 @@
+body { padding: 0 clamp(16px, 4vw, 56px) 64px; max-width: 1180px; margin: 0 auto; }
+
+.masthead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 32px;
+  padding: 48px 0 28px;
+  border-bottom: 3px double var(--rule-strong);
+}
+.eyebrow { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-soft); }
+.total {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: clamp(40px, 7vw, 76px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--kind-subscription);
+  font-variant-numeric: tabular-nums;
+}
+.total-sub { margin: 10px 0 0; color: var(--ink-soft); font-family: var(--font-mono); font-size: 14px; }
+
+.stats { display: grid; grid-template-columns: auto auto; gap: 6px 20px; margin: 0; font-size: 14px; }
+.stats dt { color: var(--ink-soft); }
+.stats dd { margin: 0; text-align: right; font-family: var(--font-mono); font-weight: 600; }
+
+main { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 40px; margin-top: 36px; }
+main > * { min-width: 0; }
+h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: -0.01em; }
+
+/* 영수증처럼 날짜 · 사이트 ...... 금액 */
+.side { align-self: start; position: sticky; top: 24px; display: grid; gap: 20px; }
+.upcoming, .cards {
+  padding: 20px;
+  background: var(--paper-raised);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.receipt { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.receipt li { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--rule); }
+.receipt .when { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); min-width: 64px; }
+.receipt .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.receipt .leader { flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-4px); }
+.receipt .amount { font-family: var(--font-mono); font-weight: 600; }
+
+.ledger-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ledger-head h2 { margin: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters { display: flex; border: 1.5px solid var(--ink); border-radius: var(--radius); overflow: hidden; }
+.filters button {
+  font: inherit; font-size: 13px; padding: 6px 11px; border: 0; background: transparent; color: var(--ink); cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+.filters button + button { border-left: 1px solid var(--rule); }
+.filters button:hover { background: var(--paper-raised); }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.table-wrap { overflow-x: auto; position: relative; }
+table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-soft);
+  padding: 10px 8px; border-bottom: 1.5px solid var(--rule-strong);
+}
+td { padding: 12px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr { transition: background var(--duration) var(--ease); }
+tbody tr:hover { background: var(--paper-raised); }
+.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.site { font-weight: 600; overflow-wrap: anywhere; }
+td.site small { display: block; font-weight: 400; color: var(--ink-soft); }
+tr.is-canceled td { color: var(--ink-soft); }
+tr.is-canceled .num { text-decoration: line-through; }
+
+.link { font: inherit; font-size: 13px; background: none; border: 0; color: var(--ink-soft); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link:hover { color: var(--ink); }
+.empty { padding: 48px 0; text-align: center; color: var(--ink-soft); }
+
+dialog {
+  width: min(460px, calc(100vw - 32px));
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  color: var(--ink);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: rgb(30 27 22 / 0.35); }
+dialog h2 { font-size: 18px; margin-bottom: 16px; }
+dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; margin-bottom: 12px; flex: 1; }
+dialog label.check { flex-direction: row; align-items: center; gap: 8px; }
+dialog input:not([type="checkbox"]), dialog select {
+  font: inherit; font-weight: 400; font-size: 14px; padding: 7px 9px;
+  border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); color: var(--ink);
+}
+dialog .row { display: flex; gap: 12px; }
+dialog [hidden] { display: none !important; }
+.evidence { font-size: 12px; margin: 0 0 12px; }
+.actions { display: flex; gap: 8px; align-items: center; }
+.spacer { flex: 1; }
+
+@media (max-width: 760px) {
+  .masthead { grid-template-columns: 1fr; padding-top: 28px; }
+  main { grid-template-columns: 1fr; }
+  .side { position: static; }
+}

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "결제 기록장",
+  "version": "0.3.0",
+  "description": "어디서 결제수단을 등록했는지, 매달 얼마 나가는지 기록하고 AWS·Azure·OpenAI·Cloudflare·GitHub·Vercel 사용료를 매일 아침 모아 봅니다.",
+  "permissions": [
+    "storage",
+    "webNavigation",
+    "alarms",
+    "identity",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/lib/detect.js",
+        "src/content.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "결제 기록장"
+  },
+  "options_page": "src/dashboard.html"
+}
