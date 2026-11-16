@@ -3,3 +3,4 @@ e2e/screenshots/
 bash.exe.stackdump
 *.stackdump
 .ruff_cache/
+dist/

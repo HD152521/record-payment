@@ -7,6 +7,10 @@
   const PRICES_AS_OF = '2026-11';
   const CONNECTORS = ['aws', 'azure', 'openai', 'cloudflare', 'github', 'vercel'];
 
+  // 실계정으로 확인한 서비스. 여기 없는 연결 서비스는 "베타"로 표시한다. 확인이 끝나면 이 목록에만 넣는다.
+  const VERIFIED_PROVIDERS = Object.freeze(['aws']);
+  const FEEDBACK_URL = 'https://github.com/HD152521/record-payment/issues';
+
   const CATEGORIES = [
     { id: 'cloud', label: '서버·클라우드' },
     { id: 'ai', label: 'AI' },
@@ -84,9 +88,23 @@
 
   const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
 
-  function search(query, category = null) {
+  /** Azure는 배포자가 앱 ID를 채워야 쓸 수 있다. 비어 있으면 선택지에서 뺀다. config를 안 넘기면 전부 쓸 수 있다고 본다. */
+  function isConnectable(provider, config) {
+    return provider !== 'azure' || !config || Boolean(config.AZURE_CLIENT_ID);
+  }
+
+  function isBeta(provider, verified = VERIFIED_PROVIDERS) {
+    return !verified.includes(provider);
+  }
+
+  function connectableProviders(config) {
+    return CONNECTORS.filter((p) => isConnectable(p, config));
+  }
+
+  function search(query, category = null, config = null) {
     const q = squash(query);
     return ITEMS.filter((item) => {
+      if (item.connect && !isConnectable(item.connect, config)) return false;
       if (category && item.category !== category) return false;
       if (!q) return true;
       return [item.name, item.site, item.id, ...(item.aliases || [])].some((v) => squash(v).includes(q));
@@ -97,6 +115,16 @@
     const h = String(host || '').toLowerCase();
     if (!h) return null;
     return ITEMS.find((item) => h === item.site || h.endsWith(`.${item.site}`)) || null;
+  }
+
+  // GitHub 사용량 보고서에 요금제·Copilot 구독료가 들어가는지 실계정으로 확인 전이라 덮지 않는다.
+  const COVERS_PLAN_FEES = new Set(['aws', 'azure', 'openai', 'cloudflare', 'vercel']);
+
+  /** 사용료 연결 값이 이 기록을 이미 포함하면 그 연결 id. 같은 돈이 두 번 더해지지 않게 한다. */
+  function coveredBy(record, connectedProviders) {
+    const item = findBySite(record && record.site);
+    const id = item && item.connect;
+    return id && COVERS_PLAN_FEES.has(id) && connectedProviders.has(id) ? id : null;
   }
 
   /** 고른 플랫폼·요금제를 기록 양식에 넣을 값으로 바꾼다. 요금제가 없으면 금액은 비워 둔다. */
@@ -111,7 +139,7 @@
     };
   }
 
-  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, findBySite, recordFields };
+  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, isConnectable, connectableProviders, VERIFIED_PROVIDERS, FEEDBACK_URL, isBeta, findBySite, recordFields, coveredBy };
   root.PaymentCatalog = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

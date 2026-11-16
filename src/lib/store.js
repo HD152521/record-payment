@@ -22,6 +22,8 @@
 
   const upsertRecord = (record) => requestWrite({ type: 'upsert', record });
   const deleteRecord = (id) => requestWrite({ type: 'delete', id });
+  const upsertRecords = (records) => requestWrite({ type: 'upsertMany', records });
+  const deleteRecords = (ids) => requestWrite({ type: 'deleteMany', ids });
 
   async function loadCards() {
     const stored = await chrome.storage.local.get(CARDS_KEY);
@@ -48,7 +50,7 @@
   }
 
   root.PaymentStore = {
-    KEY, CARDS_KEY, loadRecords, saveRecords, upsertRecord, deleteRecord, onRecordsChanged,
+    KEY, CARDS_KEY, loadRecords, saveRecords, upsertRecord, deleteRecord, upsertRecords, deleteRecords, onRecordsChanged,
     loadCards, saveCards, saveCard, removeCard, onCardsChanged,
   };
 })(globalThis);

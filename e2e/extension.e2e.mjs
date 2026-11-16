@@ -100,16 +100,29 @@ try {
   const dash = await context.newPage();
   await dash.setViewportSize({ width: 1280, height: 800 });
   await dash.goto(`chrome-extension://${extId}/src/dashboard.html`);
-  await dash.waitForSelector('#rows tr');
-  assert.equal(await dash.textContent('#monthly-total'), '18,150원');
+  await dash.waitForSelector('#rows tr', { state: 'attached' });
+  // 자동 감지는 결제 "시도"라 확인 전에는 합계에 안 들어가고 확인할 기록에 모인다
+  assert.equal(await dash.textContent('#monthly-total'), '0원');
+  assert.equal(await dash.locator('#pending-list li').count(), 3);
 
-  // 대시보드에서 금액 수정 → background 큐를 거쳐 저장되는지
+  // 고쳐서 저장하면 확인된 기록 → 오늘이 첫 결제일이라 이번 달 금액에 들어간다
+  await dash.click('#tabs a[data-page=records]');
   await dash.locator('#rows tr', { hasText: 'saas.example' }).getByRole('button', { name: '수정' }).click();
-  await dash.fill('input[name=amount]', '12000');
-  await dash.click('button[type=submit]');
-  await dash.waitForFunction(() => document.querySelector('#monthly-total').textContent === '20,250원');
+  await dash.fill('#editor-form input[name=amount]', '12000');
+  await dash.click('#editor-form button[type=submit]');
+  await dash.click('#tabs a[data-page=home]');
+  await dash.waitForFunction(() => document.querySelector('#monthly-total').textContent === '12,000원');
   const edited = (await records()).find((r) => r.site === 'saas.example');
-  assert.deepEqual([edited.amount, edited.userEdited], [12000, true]);
+  assert.deepEqual([edited.amount, edited.userEdited, edited.review], [12000, true, 'confirmed']);
+
+  // "맞아요"는 그대로 확인. 연간 99,000원은 결제일이 이번 달이라 전액이 들어간다
+  await dash.locator('#pending-list li', { hasText: 'news.example' }).getByRole('button', { name: '맞아요' }).click();
+  await dash.waitForFunction(() => document.querySelector('#monthly-total').textContent === '111,000원');
+  // "아니에요"는 기록을 지운다
+  await dash.locator('#pending-list li', { hasText: 'shop.example' }).getByRole('button', { name: '아니에요' }).click();
+  await dash.waitForFunction(() => document.querySelectorAll('#pending-list li').length === 0);
+  assert.equal(await dash.isVisible('#pending'), false);
+  assert.ok(!(await records()).some((r) => r.site === 'shop.example'));
   await dash.screenshot({ path: path.join(SHOT_DIR, 'dashboard.png'), fullPage: true });
   await dash.setViewportSize({ width: 375, height: 800 });
   await dash.screenshot({ path: path.join(SHOT_DIR, 'dashboard-mobile.png'), fullPage: true });
@@ -117,7 +130,7 @@ try {
   const pop = await context.newPage();
   await pop.setViewportSize({ width: 360, height: 420 });
   await pop.goto(`chrome-extension://${extId}/src/popup.html`);
-  await pop.waitForSelector('#recent li');
+  await pop.waitForSelector('#upcoming li');
   await pop.screenshot({ path: path.join(SHOT_DIR, 'popup.png') });
 
   console.log('E2E 통과');

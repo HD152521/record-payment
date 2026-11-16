@@ -17,7 +17,8 @@
     vercel: root.PaymentCloudVercel,
   };
 
-  const KEYS = { accounts: 'cloudAccounts', costs: 'cloudCosts', meta: 'cloudMeta' };
+  const KEYS = { accounts: 'cloudAccounts', costs: 'cloudCosts', meta: 'cloudMeta', history: 'cloudHistory' };
+  const H = root.PaymentHistory;
   const ALARM = 'cloud-refresh';
   const DAY_MINUTES = 24 * 60;
   const FX_URL = 'https://open.er-api.com/v6/latest/USD';
@@ -27,8 +28,7 @@
   const FX_MAX = 10000;
   const MAX_LABEL = 60;
   const ORIGIN_RULE_ID = 1;
-  const RETRY_FAILED_AFTER_MS = 30 * 60 * 1000;
-  // 아침 알람과 브라우저 시작이 겹쳐도 AWS를 두 번 부르지 않도록(조회당 $0.01)
+  // 아침 알람과 브라우저 시작이 겹쳐도 같은 서비스를 두 번 부르지 않도록. AWS는 costs.js에서 하루 한 번으로 따로 묶는다.
   const ALARM_MIN_AGE_MS = 60 * 60 * 1000;
   const MS_LOGIN_DOMAIN = 'login.microsoftonline.com';
 
@@ -46,6 +46,12 @@
   }
   const write = (key, value) => chrome.storage.local.set({ [key]: value });
 
+  // 화면용 사용료를 저장하면서 달별 기록(cloudHistory)에도 쌓는다. 연결을 끊어도 지난 달 값은 남긴다.
+  async function writeCosts(costs, now) {
+    const history = H.mergeCloudHistory(await read(KEYS.history, {}), costs, C.billingWindow(now));
+    await chrome.storage.local.set({ [KEYS.costs]: costs, [KEYS.history]: history });
+  }
+
   // Microsoft 토큰 엔드포인트는 "모바일·데스크톱" 앱 요청에 Origin 헤더가 붙어 있으면 거절한다.
   // 탭이 아닌 요청(tabIds: -1 = 이 확장의 background)에서만 Origin을 지운다. 사용자가 브라우저로 여는
   // Azure 포털 등의 로그인 요청은 건드리지 않는다.
@@ -61,6 +67,8 @@
   }
 
   async function ensureOriginRule() {
+    // Azure를 다시 켤 때 manifest에 declarativeNetRequestWithHostAccess·identity 권한도 되돌려 넣는다.
+    if (!chrome.declarativeNetRequest) throw new Error('이 버전에서는 Azure 연결을 쉬고 있어요');
     await chrome.declarativeNetRequest.updateSessionRules({
       removeRuleIds: [ORIGIN_RULE_ID],
       addRules: [{
@@ -80,7 +88,7 @@
   async function fetchSnapshot(account, now) {
     const provider = PROVIDERS[account.provider];
     if (account.provider === 'azure') await ensureOriginRule();
-    const { entries, warnings = [], accountPatch = null, projection } = await provider.fetchEntries(account, { now, clientId: CONFIG.AZURE_CLIENT_ID });
+    const { entries, warnings = [], accountPatch = null, projection } = await provider.fetchEntries(account, { now, clientId: CONFIG.AZURE_CLIENT_ID, githubClientId: CONFIG.GITHUB_CLIENT_ID });
     return { snapshot: { ...C.buildSnapshot(entries, now, { projection }), warnings, fetchedAt: now, error: null }, accountPatch };
   }
 
@@ -112,29 +120,21 @@
     }
   }
 
-  // 6시간이 안 지났어도 다시 가져와야 하는 경우: 달이 바뀌었거나(UTC 0시 = 한국 오전 9시),
-  // 지난번에 실패한 계정이 있고 30분이 지났을 때.
-  function isStale(meta, costs, now, maxAgeMs) {
-    if (!meta.lastRefreshAt || now - meta.lastRefreshAt >= maxAgeMs) return true;
-    const thisKey = C.billingWindow(now).thisKey;
-    return Object.values(costs).some((c) => c.month !== thisKey
-      || (c.error && now - (c.failedAt || 0) >= RETRY_FAILED_AFTER_MS));
-  }
-
   async function refreshAll({ force = false, onlyId = null, maxAgeMs = CONFIG.STALE_AFTER_MS } = {}) {
     const now = Date.now();
     const meta = await read(KEYS.meta, {});
     const accounts = await read(KEYS.accounts, []);
     if (!accounts.length) return { ok: true, skipped: true };
     const costs = await read(KEYS.costs, {});
-    if (!force && !onlyId && !isStale(meta, costs, now, maxAgeMs)) return { ok: true, skipped: true };
-    const targets = accounts.filter((a) => !onlyId || a.id === onlyId);
+    // 자동 갱신은 오래된 계정만. 화면을 자주 열어도 유료 조회(AWS)가 늘지 않는다.
+    const targets = force || onlyId ? accounts.filter((a) => !onlyId || a.id === onlyId) : C.dueAccounts(accounts, costs, now, maxAgeMs);
+    if (!targets.length) return { ok: true, skipped: true };
     const results = await Promise.all(targets.map((a) => refreshOne(a, costs[a.id], now)));
 
     const patches = new Map(targets.map((a, i) => [a.id, results[i].accountPatch]).filter(([, p]) => p));
     if (patches.size) await write(KEYS.accounts, accounts.map((a) => (patches.has(a.id) ? { ...a, ...patches.get(a.id) } : a)));
     const nextCosts = { ...costs, ...Object.fromEntries(targets.map((a, i) => [a.id, results[i].entry])) };
-    await write(KEYS.costs, nextCosts);
+    await writeCosts(nextCosts, now);
     await write(KEYS.meta, { ...(await updateFx(meta, now)), lastRefreshAt: onlyId ? meta.lastRefreshAt : now });
     return { ok: true };
   }
@@ -180,7 +180,7 @@
     const { snapshot, accountPatch } = fetched;
     const saved = { ...account, ...(accountPatch || {}) };
     await write(KEYS.accounts, existing ? accounts.map((a) => (a.id === saved.id ? saved : a)) : [...accounts, saved]);
-    await write(KEYS.costs, { ...await read(KEYS.costs, {}), [saved.id]: publicEntry(saved, snapshot) });
+    await writeCosts({ ...await read(KEYS.costs, {}), [saved.id]: publicEntry(saved, snapshot) }, now);
     const meta = await read(KEYS.meta, {});
     await write(KEYS.meta, await updateFx(meta, now));
     return { ok: true, id: saved.id };
@@ -208,6 +208,8 @@
       case 'cloud:azure-code': return serialize(() => connectAzure(p));
       case 'cloud:remove': return serialize(() => removeAccount(String(p.id)));
       case 'cloud:fx': return serialize(() => ensureFx());
+      // 모든 데이터 지우기: 진행 중인 조회가 끝난 뒤 지워야 조회 결과가 되살아나지 않는다
+      case 'cloud:wipe': return serialize(() => chrome.storage.local.clear().then(() => ({ ok: true })));
       case 'cloud:refresh': return serialize(() => refreshAll({ force: p.force === true, onlyId: p.id || null }));
       default: return Promise.reject(new Error(`알 수 없는 요청: ${msg.type}`));
     }

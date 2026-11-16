@@ -65,3 +65,39 @@ test('connectable items point at a provider the extension can connect', () => {
   for (const p of providers) assert.ok(K.CONNECTORS.includes(p), p);
   assert.ok(K.ITEMS.find((i) => i.id === 'aws').connect === 'aws');
 });
+
+test('Azure 앱 ID가 비면 연결 가능 목록과 검색에서 Azure가 빠진다', () => {
+  const empty = { AZURE_CLIENT_ID: '' };
+  assert.ok(!K.connectableProviders(empty).includes('azure'));
+  assert.ok(!K.search('', null, empty).some((i) => i.connect === 'azure'));
+  assert.ok(!K.search('azure', null, empty).some((i) => i.id === 'azure'));
+  assert.deepEqual(K.connectableProviders(empty), K.CONNECTORS.filter((p) => p !== 'azure'));
+});
+
+test('Azure 앱 ID를 채우면 다시 보인다', () => {
+  const filled = { AZURE_CLIENT_ID: '00000000-0000-0000-0000-000000000000' };
+  assert.ok(K.connectableProviders(filled).includes('azure'));
+  assert.ok(K.search('azure', null, filled).some((i) => i.id === 'azure'));
+});
+
+test('설정을 안 넘기면 기존처럼 전부 보이고, 사이트로 찾는 것은 숨김과 무관하다', () => {
+  assert.equal(K.search('').length, K.ITEMS.length);
+  assert.equal(K.findBySite('azure.microsoft.com').id, 'azure');
+});
+
+test('실계정으로 확인된 서비스는 AWS뿐이고 나머지 연결 서비스는 베타다', () => {
+  assert.deepEqual([...K.VERIFIED_PROVIDERS], ['aws']);
+  assert.equal(K.isBeta('aws'), false);
+  for (const p of ['openai', 'cloudflare', 'github', 'vercel']) assert.equal(K.isBeta(p), true, p);
+  assert.equal(K.isBeta('azure'), true);
+});
+
+test('확인된 서비스 목록 하나만 고치면 베타 표시가 사라진다', () => {
+  const verified = ['aws', 'github'];
+  assert.equal(K.isBeta('github', verified), false);
+  assert.equal(K.isBeta('vercel', verified), true);
+});
+
+test('베타 문의 링크는 GitHub 이슈 주소다', () => {
+  assert.match(K.FEEDBACK_URL, /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues/);
+});

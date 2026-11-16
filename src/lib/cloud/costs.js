@@ -163,7 +163,24 @@
     return redactSecrets(String(message || '알 수 없는 오류').slice(0, 300));
   }
 
-  const api = { DAY_MS, isoDate, round2, billingWindow, projectMonthEnd, buildSnapshot, toKRW, totalKRW, requestText, requestJson, redactSecrets, redactValues };
+  // 자동 갱신 대상 고르기. 조회 자체가 유료인 서비스(AWS Cost Explorer, 1번에 $0.01)는 하루 한 번만 부른다.
+  // 처음 연결·달 바뀜·실패 뒤 재시도는 서비스와 상관없이 다시 가져온다. "지금 갱신"(force)은 이 규칙을 거치지 않는다.
+  // 실패 뒤 재시도도 유료 서비스는 길게: 권한이 틀린 AWS 키가 30분마다 불리지 않게 한다.
+  const RETRY_FAILED_AFTER_MS = 30 * 60 * 1000;
+  const PAID_MIN_AGE_MS = { aws: 20 * 60 * 60 * 1000 };
+  const PAID_RETRY_MS = { aws: 6 * 60 * 60 * 1000 };
+
+  function isAccountDue(account, cost, now, maxAgeMs) {
+    if (!cost) return true;
+    // 실패 대기를 달 바뀜보다 먼저 본다. 실패한 항목은 지난달 month를 그대로 들고 있어서 순서가 바뀌면 매번 다시 부른다.
+    if (cost.error) return now - (cost.failedAt || 0) >= (PAID_RETRY_MS[account.provider] || RETRY_FAILED_AFTER_MS);
+    if (!cost.fetchedAt || cost.month !== billingWindow(now).thisKey) return true;
+    return now - cost.fetchedAt >= Math.max(maxAgeMs, PAID_MIN_AGE_MS[account.provider] || 0);
+  }
+
+  const dueAccounts = (accounts, costs, now, maxAgeMs) => accounts.filter((a) => isAccountDue(a, costs[a.id], now, maxAgeMs));
+
+  const api = { DAY_MS, PAID_MIN_AGE_MS, dueAccounts, isoDate, round2, billingWindow, projectMonthEnd, buildSnapshot, toKRW, totalKRW, requestText, requestJson, redactSecrets, redactValues };
   root.PaymentCloudCosts = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

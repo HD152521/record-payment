@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>결제 기록장 개인정보 처리방침</title>
+<style>
+  :root { --ink: #1b1f27; --soft: #5a6170; --line: #e3e6ec; --paper: #ffffff; --bg: #f4f5f8; --accent: #3a6df0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #e8eaf0; --soft: #a3a9b6; --line: #2c313b; --paper: #181b21; --bg: #111318; --accent: #7b9cff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  main { max-width: 760px; margin: 32px auto; padding: 28px 24px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 16px; margin: 28px 0 8px; }
+  p, li { color: var(--ink); }
+  .meta { color: var(--soft); font-size: 13px; margin: 0 0 20px; }
+  .summary { padding: 12px 16px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-top: 1px solid var(--line); }
+  th { color: var(--soft); font-weight: 600; }
+  code { font-size: 13px; }
+  a { color: var(--accent); }
+  .en { color: var(--soft); font-size: 14px; }
+  @media (max-width: 600px) { main { margin: 0; border-radius: 0; border: 0; padding: 20px 16px; } table { font-size: 13px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>결제 기록장 개인정보 처리방침</h1>
+  <p class="meta">시행일 2026년 11월 16일 · 대상: 크롬 확장프로그램 "결제 기록장"</p>
+
+  <p class="summary"><b>요약</b> · 결제 기록장은 개발자 서버가 없습니다. 모든 기록과 연결 키는 <b>사용자의 브라우저 안에만</b> 저장되고, 개발자를 포함한 누구에게도 보내지 않습니다. 광고·분석 도구도 쓰지 않습니다.</p>
+
+  <h2>1. 저장하는 정보</h2>
+  <p>아래 정보는 모두 브라우저의 확장프로그램 저장소(<code>chrome.storage.local</code>)에만 저장됩니다.</p>
+  <ul>
+    <li><b>결제 기록</b>: 사이트 도메인, 날짜, 유형(구독·일회성·결제수단 등록), 결제 주기, 금액, 결제대행사 이름, 카드 브랜드와 <b>끝 4자리</b>, 사용자가 적은 메모</li>
+    <li><b>내 카드</b>: 카드 브랜드, 끝 4자리, 사용자가 붙인 이름</li>
+    <li><b>설정</b>: 월 예산, 결제 알림 설정</li>
+    <li><b>서버·API 사용료 연결</b>: 사용자가 직접 연결한 서비스(AWS·OpenAI·Cloudflare·GitHub·Vercel)의 읽기용 키 또는 로그인 토큰, 그리고 받아 온 사용료 숫자와 원/달러 환율</li>
+  </ul>
+  <p><b>저장하지 않는 정보</b>: 전체 카드번호, 유효기간, CVC, 비밀번호, 방문한 페이지의 본문.</p>
+
+  <h2>2. 웹페이지에서 읽는 것</h2>
+  <ul>
+    <li>결제 순간을 자동으로 기록하려고 모든 페이지에서 <b>카드번호 입력칸과 결제 버튼 클릭</b>만 감지합니다. 그때 화면 글자에서 금액·주기·구독 여부를 뽑고, 카드번호 입력칸에서는 끝 4자리만 남깁니다. 페이지 원문은 저장하거나 보내지 않습니다.</li>
+    <li><b>토큰 자동 받기</b>: 사용자가 연결 화면의 버튼으로 연 탭 하나에서만, 그 서비스의 공식 콘솔(예: <code>platform.openai.com</code>, <code>github.com</code>)에 새로 만든 토큰이 보이면 그 값을 읽습니다. 사용자가 "연결하기"를 누르기 전에는 저장하지 않으며, 다른 탭과 사이트는 읽지 않습니다.</li>
+  </ul>
+
+  <h2>3. 외부로 보내는 요청</h2>
+  <p>개발자가 운영하는 서버는 없습니다. 확장프로그램은 아래 주소로만 직접 요청합니다.</p>
+  <table>
+    <tr><th>언제</th><th>어디로</th><th>무엇을</th></tr>
+    <tr><td>사용자가 사용료를 연결했을 때</td><td>연결한 서비스의 공식 API만<br><code>ce.us-east-1.amazonaws.com</code>, <code>api.openai.com</code>, <code>api.cloudflare.com</code>, <code>api.github.com</code>, <code>github.com</code>(로그인), <code>api.vercel.com</code></td><td>사용자가 넣은 키·토큰으로 그 계정의 사용료를 조회합니다. 키는 해당 서비스에만 보냅니다.</td></tr>
+    <tr><td>달러 금액을 원화로 합칠 때</td><td><code>open.er-api.com</code></td><td>공개 환율 조회. 사용자 정보는 보내지 않습니다.</td></tr>
+  </table>
+  <p>저장된 정보를 판매하거나 제3자와 공유하지 않으며, 광고·신용평가·대출 심사 등 확장프로그램 기능과 무관한 목적으로 쓰지 않습니다.</p>
+
+  <h2>4. 사용료 조회 비용 (AWS)</h2>
+  <p>AWS Cost Explorer API는 조회 1번에 미화 0.01달러를 <b>사용자의 AWS 계정</b>에 청구합니다. 결제 기록장은 자동 조회를 하루 한 번으로 제한하며(한 달 약 0.30달러), "지금 갱신"을 누를 때마다 0.01달러가 추가됩니다. 이 비용은 AWS가 청구하며 결제 기록장은 어떤 돈도 받지 않습니다. 다른 서비스의 사용료 조회 API는 무료입니다.</p>
+
+  <h2>5. 보관과 삭제</h2>
+  <ul>
+    <li>정보는 사용자가 지우기 전까지 브라우저에 남습니다.</li>
+    <li>설정 화면의 <b>모든 데이터 지우기</b>로 기록·카드·연결 키를 한 번에 지울 수 있습니다.</li>
+    <li>사용료 연결을 해제하면 그 서비스의 키·토큰이 바로 지워집니다.</li>
+    <li>확장프로그램을 삭제하면 저장된 정보도 모두 지워집니다.</li>
+    <li>설정의 백업 파일에는 연결 키·토큰이 들어가지 않습니다.</li>
+  </ul>
+
+  <h2>6. 권한을 쓰는 이유</h2>
+  <table>
+    <tr><th>권한</th><th>이유</th></tr>
+    <tr><td><code>storage</code></td><td>기록·설정·연결 키를 브라우저 안에 저장</td></tr>
+    <tr><td>모든 사이트 접근, <code>webNavigation</code></td><td>어느 사이트에서 결제했는지 감지하고, 결제창 팝업·결제대행사 이동을 원래 사이트 기록으로 묶음</td></tr>
+    <tr><td><code>scripting</code></td><td>토큰 자동 받기: 사용자가 연 서비스 콘솔 탭에서만 토큰을 읽음</td></tr>
+    <tr><td><code>alarms</code></td><td>매일 아침 사용료 갱신, 결제일 알림 시각 맞추기</td></tr>
+    <tr><td><code>notifications</code></td><td>결제일·체험 종료 알림</td></tr>
+  </table>
+
+  <h2>7. 변경과 문의</h2>
+  <p>이 방침이 바뀌면 이 페이지의 시행일을 고칩니다. 문의는 <a href="https://github.com/HD152521/record-payment/issues">GitHub 이슈</a>로 남겨 주세요.</p>
+
+  <h2>English summary</h2>
+  <p class="en">Payment Tracker has no developer server. All records, card brand and last 4 digits, settings and the read-only keys you connect are stored only in your browser (<code>chrome.storage.local</code>). Requests go only to the official APIs of services you choose to connect and to a public exchange-rate API (open.er-api.com). We do not sell, share or transfer user data to third parties, do not use it for purposes unrelated to the extension's single purpose, and do not use it for creditworthiness or lending. The use of information complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. AWS Cost Explorer charges $0.01 per request to your own AWS account; automatic refresh is limited to once a day.</p>
+</main>
+</body>
+</html>

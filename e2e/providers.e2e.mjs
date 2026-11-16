@@ -64,7 +64,7 @@ const errors = [];
 
 async function connect(dash, provider, fill) {
   await dash.click('#cloud-add');
-  await dash.click(`.segmented label:has(input[value=${provider}])`);
+  await dash.click(`.provider-grid label:has(input[value=${provider}])`);
   for (const [name, value] of fill) await dash.fill(`#cloud-form [name=${name}]`, value);
   await dash.click('#cloud-submit');
 }
@@ -73,7 +73,7 @@ try {
   const dash = await context.newPage();
   dash.on('pageerror', (e) => errors.push(e.message));
   await dash.setViewportSize({ width: 1280, height: 900 });
-  await dash.goto(`chrome-extension://${extId}/src/dashboard.html`);
+  await dash.goto(`chrome-extension://${extId}/src/dashboard.html#cloud`);
 
   // Cloudflare: 틀린 토큰은 이유와 함께 거절, 맞는 토큰은 계정을 찾아 청구 내역을 읽는다
   await connect(dash, 'cloudflare', [['cfToken', 'w'.repeat(40)]]);
@@ -114,10 +114,59 @@ try {
   assert.equal(await dash.inputValue('#editor-form [name=amount]'), '4');
   await dash.click('#cancel-btn');
 
+  // 연결 마법사: 6개 서비스 모두 안내서·바로가기가 보이고, 버튼 하나로 토큰 만들기 화면이 열린다.
+  // 확장이 연 탭은 route가 붙기 전에 나가 버려서, 실제 콘솔에 가지 않게 탭 열기만 가로채 주소를 확인한다.
+  await dash.evaluate(() => {
+    globalThis.openedTabs = [];
+    chrome.tabs.create = async ({ url }) => { globalThis.openedTabs.push(url); return { id: 1 }; };
+  });
+  const openedBy = async (selector) => {
+    const before = await dash.evaluate(() => globalThis.openedTabs.length);
+    await dash.click(selector);
+    await dash.waitForFunction((n) => globalThis.openedTabs.length > n, before);
+    return new URL(await dash.evaluate(() => globalThis.openedTabs.at(-1)));
+  };
+  const OPEN_HOST = { aws: 'console.aws.amazon.com', openai: 'platform.openai.com', cloudflare: 'dash.cloudflare.com', github: 'github.com', vercel: 'vercel.com' };
+  await dash.click('#cloud-add');
+  for (const provider of ['aws', 'openai', 'cloudflare', 'github', 'vercel']) {
+    await dash.click(`.provider-grid label:has(input[value=${provider}])`);
+    const steps = await dash.locator('#cloud-guide > li').count();
+    assert.ok(steps >= 3 && steps <= 5, `${provider} 안내서 ${steps}단계`);
+    assert.ok(await dash.locator('#cloud-links a[href^="https://"]').count() >= 1, `${provider} 바로가기`);
+    assert.doesNotMatch(await dash.textContent('#cloud-dialog'), /null|undefined/, `${provider} 안내에 빈 값이 찍히면 안 된다`);
+    assert.equal(await dash.isVisible('#cloud-open-create'), true);
+    assert.equal((await openedBy('#cloud-open-create')).host, OPEN_HOST[provider]);
+  }
+  await dash.click('.provider-grid label:has(input[value=cloudflare])');
+  const cfUrl = await openedBy('#cloud-open-create');
+  assert.deepEqual(JSON.parse(cfUrl.searchParams.get('permissionGroupKeys')), [{ key: 'billing', type: 'read' }]);
+  assert.equal(await dash.isVisible('#cloud-prefill-note'), true);
+  await dash.click('.provider-grid label:has(input[value=github])');
+  assert.equal((await openedBy('#cloud-open-create')).searchParams.get('plan'), 'read');
+  // GitHub 앱 ID가 비어 있는 설치본: 로그인 버튼 대신 안내만 보인다
+  assert.equal(await dash.isVisible('#gh-login'), false);
+  assert.equal(await dash.isVisible('#gh-login-missing'), true);
+  await dash.fill('#cloud-form [name=ghOrg]', 'acme');
+  const ghOrgUrl = await openedBy('#cloud-open-create');
+  assert.equal(ghOrgUrl.searchParams.get('target_name'), 'acme');
+  assert.equal(ghOrgUrl.searchParams.get('organization_administration'), 'read');
+  await dash.click('.provider-grid label:has(input[value=aws])');
+  // 템플릿 S3 주소가 비어 있는 설치본: 템플릿 파일 받기 + CloudFormation 업로드 화면 + IAM 링크
+  const awsOpen = await openedBy('#cloud-open-create');
+  assert.equal(awsOpen.pathname + awsOpen.hash, '/cloudformation/home#/stacks/create');
+  assert.equal(await dash.isVisible('#cloud-prefill-note'), false);
+  const templateHref = await dash.getAttribute('#cloud-guide a[download]', 'href');
+  assert.match(templateHref, /^chrome-extension:\/\/[a-z]+\/aws\/readonly-cost-user\.json$/);
+  const templateText = await dash.evaluate((href) => fetch(href).then((r) => r.text()), templateHref);
+  assert.deepEqual(JSON.parse(templateText).Resources.CostReaderUser.Properties.Policies[0].PolicyDocument.Statement[0].Action, ['ce:GetCostAndUsage'], 'AWS 템플릿 파일');
+  assert.ok(await dash.locator('#cloud-links a[href^="https://console.aws.amazon.com/iam/"]').count() >= 1, 'IAM 액세스 키 화면 링크');
+  await dash.screenshot({ path: path.join(SHOT_DIR, 'providers-wizard-aws.png') });
+  await dash.click('#cloud-cancel');
+
   await dash.screenshot({ path: path.join(SHOT_DIR, 'providers-dashboard.png'), fullPage: true });
   await dash.setViewportSize({ width: 375, height: 800 });
   await dash.click('#cloud-add');
-  await dash.click('.segmented label:has(input[value=cloudflare])');
+  await dash.click('.provider-grid label:has(input[value=cloudflare])');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'providers-dialog-mobile.png') });
 
   assert.deepEqual(errors, []);

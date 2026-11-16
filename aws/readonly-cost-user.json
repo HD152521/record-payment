@@ -1,0 +1,41 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Payment Tracker: an IAM user that can only call Cost Explorer GetCostAndUsage. No access key is created here; make one in the IAM console so the secret is shown only to you.",
+  "Parameters": {
+    "UserName": {
+      "Type": "String",
+      "Default": "payment-tracker-cost-reader",
+      "AllowedPattern": "[A-Za-z0-9+=,.@_-]{1,64}",
+      "Description": "Name of the IAM user to create"
+    }
+  },
+  "Resources": {
+    "CostReaderUser": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+        "UserName": { "Ref": "UserName" },
+        "Policies": [
+          {
+            "PolicyName": "payment-tracker-cost-explorer-read",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                { "Effect": "Allow", "Action": ["ce:GetCostAndUsage"], "Resource": "*" }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "UserName": {
+      "Description": "Open this user in IAM > Users > Security credentials > Create access key",
+      "Value": { "Ref": "CostReaderUser" }
+    },
+    "IamUsersPage": {
+      "Description": "IAM users list",
+      "Value": "https://console.aws.amazon.com/iam/home#/users"
+    }
+  }
+}

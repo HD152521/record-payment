@@ -5,7 +5,7 @@ const L = require('../src/lib/ledger.js');
 const NOW = new Date(2026, 8, 29).getTime();
 
 function sub(fields) {
-  return L.createRecord({ site: 'x.com', kind: 'subscription', cycle: 'monthly', amount: 10000, currency: 'KRW', ...fields }, NOW);
+  return L.createRecord({ site: 'x.com', kind: 'subscription', cycle: 'monthly', amount: 10000, currency: 'KRW', review: 'confirmed', ...fields }, NOW);
 }
 
 test('formatMoney labels currencies other than KRW and USD', () => {
@@ -36,13 +36,42 @@ test('summarize splits totals by currency and counts one-time spend this month',
     sub({ amount: 9900 }),
     sub({ amount: 20, currency: 'USD' }),
     sub({ amount: 5000, status: 'canceled' }),
-    L.createRecord({ site: 'shop.com', kind: 'one_time', amount: 30000, currency: 'KRW' }, NOW),
-    L.createRecord({ site: 'old.com', kind: 'one_time', amount: 1000, currency: 'KRW' }, new Date(2026, 5, 1).getTime()),
+    L.createRecord({ site: 'shop.com', kind: 'one_time', amount: 30000, currency: 'KRW', review: 'confirmed' }, NOW),
+    L.createRecord({ site: 'old.com', kind: 'one_time', amount: 1000, currency: 'KRW', review: 'confirmed' }, new Date(2026, 5, 1).getTime()),
   ];
   const s = L.summarize(records, NOW);
   assert.deepEqual(s.monthly, { KRW: 9900, USD: 20 });
   assert.deepEqual(s.oneTimeThisMonth, { KRW: 30000 });
   assert.equal(s.activeSubscriptions, 2);
+});
+
+test('이번 달 돈은 나간 돈(오늘까지 결제일)과 나갈 돈(남은 결제일)으로 나뉜다', () => {
+  const now = new Date(2026, 10, 14, 15).getTime(); // 11-14 오후
+  const day = (d) => new Date(2026, 10, d).getTime();
+  const records = [
+    sub({ amount: 10000, startedAt: new Date(2026, 9, 5).getTime() }), // 11-05 결제 → 나간 돈
+    sub({ amount: 13500, startedAt: new Date(2026, 9, 14).getTime() }), // 오늘 결제 → 나간 돈
+    sub({ amount: 20, currency: 'USD', startedAt: new Date(2026, 9, 20).getTime() }), // 11-20 → 나갈 돈
+    L.createRecord({ site: 'shop.com', kind: 'one_time', amount: 30000, currency: 'KRW', review: 'confirmed', startedAt: day(3) }, day(3)),
+    L.createRecord({ site: 'pre.com', kind: 'one_time', amount: 5000, currency: 'KRW', review: 'confirmed', startedAt: day(25) }, day(3)),
+  ];
+  const s = L.summarize(records, now);
+  assert.deepEqual(s.paidThisMonth, { KRW: 53500 });
+  assert.deepEqual(s.dueThisMonth, { USD: 20, KRW: 5000 });
+  assert.deepEqual(s.thisMonth, { KRW: 58500, USD: 20 });
+});
+
+test('곧 나갈 돈: 7일 안 결제 예정 합계(다음 달로 넘어가도 센다)', () => {
+  const now = new Date(2026, 10, 28, 12).getTime(); // 11-28
+  const records = [
+    sub({ amount: 13500, startedAt: new Date(2026, 9, 30).getTime() }), // 11-30, D-2
+    sub({ amount: 20, currency: 'USD', startedAt: new Date(2026, 9, 3).getTime() }), // 12-03, D-5
+    sub({ amount: 9900, startedAt: new Date(2026, 9, 15).getTime() }), // 12-15, 7일 밖
+  ];
+  const s = L.summarize(records, now);
+  assert.deepEqual(s.soon, { KRW: 13500, USD: 20 });
+  assert.equal(s.upcoming.length, 3, '목록은 그대로 30일 안');
+  assert.deepEqual(s.upcoming.map((u) => L.daysUntil(u.date, now)), [2, 5, 17]);
 });
 
 test('mergeRecord upgrades kind but never downgrades it', () => {
