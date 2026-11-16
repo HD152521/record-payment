@@ -7,6 +7,10 @@
   const PRICES_AS_OF = '2026-11';
   const CONNECTORS = ['aws', 'azure', 'openai', 'cloudflare', 'github', 'vercel'];
 
+  // 실계정으로 확인한 서비스. 여기 없는 연결 서비스는 "베타"로 표시한다. 확인이 끝나면 이 목록에만 넣는다.
+  const VERIFIED_PROVIDERS = Object.freeze(['aws']);
+  const FEEDBACK_URL = 'https://github.com/HD152521/record-payment/issues';
+
   const CATEGORIES = [
     { id: 'cloud', label: '서버·클라우드' },
     { id: 'ai', label: 'AI' },
@@ -84,9 +88,23 @@
 
   const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
 
-  function search(query, category = null) {
+  /** Azure는 배포자가 앱 ID를 채워야 쓸 수 있다. 비어 있으면 선택지에서 뺀다. config를 안 넘기면 전부 쓸 수 있다고 본다. */
+  function isConnectable(provider, config) {
+    return provider !== 'azure' || !config || Boolean(config.AZURE_CLIENT_ID);
+  }
+
+  function isBeta(provider, verified = VERIFIED_PROVIDERS) {
+    return !verified.includes(provider);
+  }
+
+  function connectableProviders(config) {
+    return CONNECTORS.filter((p) => isConnectable(p, config));
+  }
+
+  function search(query, category = null, config = null) {
     const q = squash(query);
     return ITEMS.filter((item) => {
+      if (item.connect && !isConnectable(item.connect, config)) return false;
       if (category && item.category !== category) return false;
       if (!q) return true;
       return [item.name, item.site, item.id, ...(item.aliases || [])].some((v) => squash(v).includes(q));
@@ -121,7 +139,7 @@
     };
   }
 
-  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, findBySite, recordFields, coveredBy };
+  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, isConnectable, connectableProviders, VERIFIED_PROVIDERS, FEEDBACK_URL, isBeta, findBySite, recordFields, coveredBy };
   root.PaymentCatalog = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

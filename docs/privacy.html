@@ -39,7 +39,7 @@
     <li><b>결제 기록</b>: 사이트 도메인, 날짜, 유형(구독·일회성·결제수단 등록), 결제 주기, 금액, 결제대행사 이름, 카드 브랜드와 <b>끝 4자리</b>, 사용자가 적은 메모</li>
     <li><b>내 카드</b>: 카드 브랜드, 끝 4자리, 사용자가 붙인 이름</li>
     <li><b>설정</b>: 월 예산, 결제 알림 설정</li>
-    <li><b>서버·API 사용료 연결</b>: 사용자가 직접 연결한 서비스(AWS·Azure·OpenAI·Cloudflare·GitHub·Vercel)의 읽기용 키 또는 로그인 토큰, 그리고 받아 온 사용료 숫자와 원/달러 환율</li>
+    <li><b>서버·API 사용료 연결</b>: 사용자가 직접 연결한 서비스(AWS·OpenAI·Cloudflare·GitHub·Vercel)의 읽기용 키 또는 로그인 토큰, 그리고 받아 온 사용료 숫자와 원/달러 환율</li>
   </ul>
   <p><b>저장하지 않는 정보</b>: 전체 카드번호, 유효기간, CVC, 비밀번호, 방문한 페이지의 본문.</p>
 
@@ -53,7 +53,7 @@
   <p>개발자가 운영하는 서버는 없습니다. 확장프로그램은 아래 주소로만 직접 요청합니다.</p>
   <table>
     <tr><th>언제</th><th>어디로</th><th>무엇을</th></tr>
-    <tr><td>사용자가 사용료를 연결했을 때</td><td>연결한 서비스의 공식 API만<br><code>ce.us-east-1.amazonaws.com</code>, <code>management.azure.com</code>, <code>login.microsoftonline.com</code>, <code>api.openai.com</code>, <code>api.cloudflare.com</code>, <code>api.github.com</code>, <code>github.com</code>(로그인), <code>api.vercel.com</code></td><td>사용자가 넣은 키·토큰으로 그 계정의 사용료를 조회합니다. 키는 해당 서비스에만 보냅니다.</td></tr>
+    <tr><td>사용자가 사용료를 연결했을 때</td><td>연결한 서비스의 공식 API만<br><code>ce.us-east-1.amazonaws.com</code>, <code>api.openai.com</code>, <code>api.cloudflare.com</code>, <code>api.github.com</code>, <code>github.com</code>(로그인), <code>api.vercel.com</code></td><td>사용자가 넣은 키·토큰으로 그 계정의 사용료를 조회합니다. 키는 해당 서비스에만 보냅니다.</td></tr>
     <tr><td>달러 금액을 원화로 합칠 때</td><td><code>open.er-api.com</code></td><td>공개 환율 조회. 사용자 정보는 보내지 않습니다.</td></tr>
   </table>
   <p>저장된 정보를 판매하거나 제3자와 공유하지 않으며, 광고·신용평가·대출 심사 등 확장프로그램 기능과 무관한 목적으로 쓰지 않습니다.</p>
@@ -78,8 +78,6 @@
     <tr><td><code>scripting</code></td><td>토큰 자동 받기: 사용자가 연 서비스 콘솔 탭에서만 토큰을 읽음</td></tr>
     <tr><td><code>alarms</code></td><td>매일 아침 사용료 갱신, 결제일 알림 시각 맞추기</td></tr>
     <tr><td><code>notifications</code></td><td>결제일·체험 종료 알림</td></tr>
-    <tr><td><code>identity</code></td><td>Azure(Microsoft) 로그인 창 열기</td></tr>
-    <tr><td><code>declarativeNetRequestWithHostAccess</code></td><td>Microsoft 로그인 토큰 요청에서 확장 자신의 요청 헤더(Origin)만 지움. 다른 사이트 요청은 건드리지 않음</td></tr>
   </table>
 
   <h2>7. 변경과 문의</h2>

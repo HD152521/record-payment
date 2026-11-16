@@ -128,14 +128,13 @@ try {
   };
   const OPEN_HOST = { aws: 'console.aws.amazon.com', openai: 'platform.openai.com', cloudflare: 'dash.cloudflare.com', github: 'github.com', vercel: 'vercel.com' };
   await dash.click('#cloud-add');
-  for (const provider of ['aws', 'azure', 'openai', 'cloudflare', 'github', 'vercel']) {
+  for (const provider of ['aws', 'openai', 'cloudflare', 'github', 'vercel']) {
     await dash.click(`.provider-grid label:has(input[value=${provider}])`);
     const steps = await dash.locator('#cloud-guide > li').count();
     assert.ok(steps >= 3 && steps <= 5, `${provider} 안내서 ${steps}단계`);
     assert.ok(await dash.locator('#cloud-links a[href^="https://"]').count() >= 1, `${provider} 바로가기`);
     assert.doesNotMatch(await dash.textContent('#cloud-dialog'), /null|undefined/, `${provider} 안내에 빈 값이 찍히면 안 된다`);
-    assert.equal(await dash.isVisible('#cloud-open-create'), provider !== 'azure');
-    if (provider === 'azure') continue;
+    assert.equal(await dash.isVisible('#cloud-open-create'), true);
     assert.equal((await openedBy('#cloud-open-create')).host, OPEN_HOST[provider]);
   }
   await dash.click('.provider-grid label:has(input[value=cloudflare])');

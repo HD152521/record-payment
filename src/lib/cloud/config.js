@@ -1,6 +1,6 @@
 /* 배포자가 한 번만 채우는 값. 사용자 비밀값은 여기 두지 않는다.
    AZURE_CLIENT_ID: Microsoft Entra에 등록한 "결제 기록장" 앱의 애플리케이션(클라이언트) ID.
-   비어 있으면 Azure 연결 버튼이 안내 문구만 보여준다. 등록 방법은 README "Azure 앱 등록" 참고.
+   비어 있으면 Azure는 연결 화면과 빠른 추가 목록에서 보이지 않는다. 등록 방법은 README "Azure 앱 등록" 참고.
    GITHUB_CLIENT_ID: GitHub App(사용자 권한 Plan: read, device flow 켬)의 Client ID. 비밀키(client secret)는 넣지 않는다.
    비어 있으면 "GitHub 로그인으로 연결" 버튼 대신 안내만 보이고, 토큰 붙여넣기는 그대로 된다.
    AWS_TEMPLATE_URL: 템플릿을 올린 S3 주소. 채우면 AWS 연결 버튼이 CloudFormation 빠른 생성 링크로 열린다. */

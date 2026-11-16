@@ -41,6 +41,14 @@
       <dl class="stats" id="stats"></dl>
     </header>
 
+    <section class="onboarding" id="onboarding" aria-labelledby="onboarding-h" hidden>
+      <h2 id="onboarding-h">처음이라면 이 순서로 해 보세요</h2>
+      <ol class="onboarding-steps" id="onboarding-steps"></ol>
+      <div class="onboarding-foot">
+        <button type="button" class="btn ghost small" id="onboarding-dismiss">다음에 하기</button>
+      </div>
+    </section>
+
     <section class="budget" id="budget" aria-labelledby="budget-h">
       <div class="budget-head">
         <h2 id="budget-h">이번 달 예산</h2>
@@ -145,7 +153,7 @@
       </div>
       <ul class="cloud-accounts" id="cloud-accounts"></ul>
       <div class="empty" id="cloud-empty" hidden>
-        <ul class="provider-chips" aria-label="연결할 수 있는 서비스"><li>AWS</li><li>Azure</li><li>OpenAI</li><li>Cloudflare</li><li>GitHub</li><li>Vercel</li></ul>
+        <ul class="provider-chips" aria-label="연결할 수 있는 서비스"><li>AWS</li><li data-provider="azure">Azure</li><li>OpenAI</li><li>Cloudflare</li><li>GitHub</li><li>Vercel</li></ul>
         <span>연결하면 매일 아침 이번 달 사용료를 가져와요. 키는 이 브라우저에만 저장돼요.</span>
       </div>
     </section>
@@ -335,6 +343,7 @@
         <label><input type="radio" name="provider" value="github"> GitHub</label>
         <label><input type="radio" name="provider" value="vercel"> Vercel</label>
       </div>
+      <p class="hint" id="cloud-beta-note" hidden>이 서비스는 아직 실제 계정으로 확인하지 못한 베타예요. <a class="link" href="https://github.com/HD152521/record-payment/issues" target="_blank" rel="noopener noreferrer">문제가 있으면 알려 주세요</a></p>
 
       <section class="wizard-guide" aria-labelledby="cloud-step2">
         <p class="wizard-step" id="cloud-step2"><span class="step-no" aria-hidden="true">2</span><span id="cloud-step2-title">토큰 만들기</span></p>
@@ -426,9 +435,11 @@
   <script src="lib/store.js"></script>
   <script src="lib/catalog.js"></script>
   <script src="lib/history.js"></script>
+  <script src="lib/forecast.js"></script>
   <script src="lib/settings.js"></script>
   <script src="lib/backup.js"></script>
   <script src="lib/quickadd.js"></script>
+  <script src="lib/onboarding.js"></script>
   <script src="ui.js"></script>
   <script src="lib/cloud/config.js"></script>
   <script src="lib/cloud/costs.js"></script>
@@ -444,6 +455,7 @@
   <script src="cloud-ui.js"></script>
   <script src="quick-add.js"></script>
   <script src="cards-page.js"></script>
+  <script src="onboarding-page.js"></script>
   <script src="router.js"></script>
   <script src="trends.js"></script>
   <script src="settings-page.js"></script>

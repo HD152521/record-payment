@@ -101,15 +101,32 @@ try {
   assert.match(awsCard, /\$32\.77/);
   assert.match(awsCard, /Amazon Elastic Container Service/);
 
-  // 5) Azure: 앱 ID가 없으면 버튼이 막히고 안내가 보인다
+  // 5) Azure: 앱 ID가 없으면 연결 화면·빠른 추가 목록에 선택지가 없다
   await dash.click('#cloud-add');
-  await dash.click('.provider-grid label:has(input[value=azure])');
-  assert.equal(await dash.isDisabled('#cloud-submit'), true);
-  assert.equal(await dash.isVisible('#azure-missing'), true);
-  await dash.screenshot({ path: path.join(SHOT_DIR, 'cloud-dialog-azure.png') });
+  assert.equal(await dash.locator('.provider-grid label:has(input[value=azure])').isVisible(), false);
+  assert.equal(await dash.locator('.provider-grid label:visible').count(), 5);
+  assert.equal(await dash.locator('.provider-chips li', { hasText: 'Azure' }).count(), 0);
+  // 6) 베타 표시: AWS만 없고 나머지 연결 서비스 선택지·카드에는 있다
+  const betaOf = (p) => dash.locator(`.provider-grid label:has(input[value=${p}]) .badge-beta`).count();
+  assert.equal(await betaOf('aws'), 0);
+  for (const p of ['openai', 'cloudflare', 'github', 'vercel']) assert.equal(await betaOf(p), 1, p);
+  assert.equal(await dash.isVisible('#cloud-beta-note'), false, 'AWS에는 베타 안내가 없다');
+  await dash.click('.provider-grid label:has(input[value=openai])');
+  assert.equal(await dash.isVisible('#cloud-beta-note'), true);
+  assert.match(await dash.getAttribute('#cloud-beta-note a', 'href'), /github\.com\/.+\/issues/);
+  assert.equal(await dash.locator('.cloud-card.provider-aws .badge-beta').count(), 0);
+  assert.equal(await dash.locator('.cloud-card.provider-openai .badge-beta').count(), 1);
+  assert.equal(await dash.locator('.cloud-card.provider-openai .feedback-link').count(), 1);
+  assert.equal(await dash.locator('.cloud-card.provider-aws .feedback-link').count(), 0);
+  assert.ok(await dash.locator('.badge-beta').first().evaluate((n) => parseFloat(getComputedStyle(n).fontSize) <= 12));
   await dash.click('.provider-grid label:has(input[value=aws])');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'cloud-dialog-aws.png') });
   await dash.click('#cloud-cancel');
+  await dash.click('#add-btn');
+  await dash.fill('#picker-form [name=q]', 'azure');
+  await dash.waitForSelector('#picker-empty', { state: 'visible' });
+  assert.equal(await dash.locator('#picker-list li').count(), 0);
+  await dash.click('#picker-cancel');
 
   // 6) 갱신 실패 시 지난 숫자는 남기고 오류만 표시
   await context.unroute('https://api.openai.com/**');
@@ -126,8 +143,11 @@ try {
   const pop = await context.newPage();
   await pop.setViewportSize({ width: 360, height: 460 });
   await pop.goto(`chrome-extension://${extId}/src/popup.html`);
-  await pop.waitForSelector('#cloud:not([hidden])');
-  assert.match(await pop.textContent('#cloud'), /51,758원/);
+  await pop.waitForFunction(() => /51,758원/.test(document.querySelector('#cloud-line').textContent));
+  // 팝업 큰 숫자는 홈의 "이번 달 예상"과 같아야 한다
+  await dash.setViewportSize({ width: 1280, height: 900 });
+  await dash.click('#tabs a[data-page=home]');
+  assert.equal(await pop.textContent('#total'), await dash.textContent('#monthly-total'));
   await pop.screenshot({ path: path.join(SHOT_DIR, 'popup.png') });
 
   // 8) 매일 아침 알람이 걸려 있는지
@@ -135,33 +155,36 @@ try {
   assert.ok(alarm && alarm.periodInMinutes === 1440, '매일 갱신 알람이 있어야 한다');
   assert.equal(new Date(alarm.scheduledTime).getHours(), 8);
 
-  // 9) Microsoft 토큰 요청의 Origin 제거 규칙: 실제 규칙 조건을 로컬 에코 서버 도메인으로 바꿔 확인.
-  //    background 요청에서는 Origin이 빠지고, 웹페이지(탭)에서 보낸 같은 요청은 그대로여야 한다.
-  const echo = http.createServer((req, res) => {
-    res.setHeader('content-type', 'application/json');
-    res.setHeader('access-control-allow-origin', '*');
-    res.end(JSON.stringify({ origin: req.headers.origin || null }));
-  });
-  await new Promise((r) => echo.listen(0, '127.0.0.1', r));
-  const echoUrl = `http://127.0.0.1:${echo.address().port}/organizations/oauth2/v2.0/token`;
-  const fromWorker = await worker.evaluate(async (u) => {
-    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [1], addRules: [{
-      id: 1, priority: 1,
-      action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] },
-      condition: PaymentCloudService.originRuleCondition('127.0.0.1'),
-    }] });
-    const res = await fetch(u, { method: 'POST', body: 'x=1', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
-    return (await res.json()).origin;
-  }, echoUrl);
-  const tab = await context.newPage();
-  await tab.goto(`http://127.0.0.1:${echo.address().port}/`);
-  const fromTab = await tab.evaluate(async (u) => {
-    const res = await fetch(u, { method: 'POST', body: 'x=1', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
-    return (await res.json()).origin;
-  }, echoUrl);
-  echo.close();
-  assert.equal(fromWorker, null, 'background의 토큰 요청에서는 Origin이 빠져야 한다');
-  assert.ok(fromTab && fromTab.startsWith('http://127.0.0.1'), '웹페이지 요청의 Origin은 건드리면 안 된다');
+  // 9)는 Azure를 켠 버전(manifest에 declarativeNetRequestWithHostAccess 권한)에서만 확인한다.
+  if (await worker.evaluate(() => Boolean(chrome.declarativeNetRequest))) {
+    // 9) Microsoft 토큰 요청의 Origin 제거 규칙: 실제 규칙 조건을 로컬 에코 서버 도메인으로 바꿔 확인.
+    //    background 요청에서는 Origin이 빠지고, 웹페이지(탭)에서 보낸 같은 요청은 그대로여야 한다.
+    const echo = http.createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('access-control-allow-origin', '*');
+      res.end(JSON.stringify({ origin: req.headers.origin || null }));
+    });
+    await new Promise((r) => echo.listen(0, '127.0.0.1', r));
+    const echoUrl = `http://127.0.0.1:${echo.address().port}/organizations/oauth2/v2.0/token`;
+    const fromWorker = await worker.evaluate(async (u) => {
+      await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [1], addRules: [{
+        id: 1, priority: 1,
+        action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] },
+        condition: PaymentCloudService.originRuleCondition('127.0.0.1'),
+      }] });
+      const res = await fetch(u, { method: 'POST', body: 'x=1', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+      return (await res.json()).origin;
+    }, echoUrl);
+    const tab = await context.newPage();
+    await tab.goto(`http://127.0.0.1:${echo.address().port}/`);
+    const fromTab = await tab.evaluate(async (u) => {
+      const res = await fetch(u, { method: 'POST', body: 'x=1', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+      return (await res.json()).origin;
+    }, echoUrl);
+    echo.close();
+    assert.equal(fromWorker, null, 'background의 토큰 요청에서는 Origin이 빠져야 한다');
+    assert.ok(fromTab && fromTab.startsWith('http://127.0.0.1'), '웹페이지 요청의 Origin은 건드리면 안 된다');
+  }
 
   assert.deepEqual(pageErrors, []);
   console.log('클라우드 E2E 통과');

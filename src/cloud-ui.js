@@ -56,6 +56,17 @@
       el('dd', {}, L.formatMoney(amount, currency), el('small', {}, krwText(amount, currency))));
   }
 
+  const betaBadge = () => el('span', { class: 'badge-beta' }, '베타');
+  const feedbackLink = () => el('a', { class: 'link feedback-link', href: K.FEEDBACK_URL, target: '_blank', rel: 'noopener noreferrer' }, '문제가 있으면 알려 주세요');
+
+  /* 연결 화면 선택지에 베타 배지를 한 번만 붙인다. */
+  function markBetaChoices() {
+    for (const radio of form().elements.provider) {
+      const label = radio.closest('label');
+      if (K.isBeta(radio.value) && !label.querySelector('.badge-beta')) label.append(betaBadge());
+    }
+  }
+
   function accountCard(a) {
     const hasData = a.fetchedAt != null;
     const services = (a.services || []).slice(0, TOP_SERVICES).map((s) =>
@@ -67,6 +78,7 @@
     return el('li', { class: `cloud-card provider-${a.provider}${a.error ? ' has-error' : ''}` },
       el('header', {},
         el('span', { class: 'badge provider' }, PROVIDER_LABEL[a.provider] || a.provider),
+        K.isBeta(a.provider) && betaBadge(),
         el('span', { class: 'cloud-label' }, a.label)),
       hasData && el('p', { class: 'cloud-mtd' }, L.formatMoney(a.monthToDate, a.currency),
         el('small', {}, krwText(a.monthToDate, a.currency))),
@@ -79,6 +91,7 @@
       el('footer', {},
         el('span', { class: 'muted' }, hasData ? `${formatTime(a.fetchedAt)} 기준` : '아직 못 가져왔어요'),
         el('span', { class: 'spacer' }),
+        K.isBeta(a.provider) && feedbackLink(),
         (a.error || a.needsReauth) && el('button', { type: 'button', class: 'link', onclick: () => openDialog(a.provider, a.id) }, fixLabel),
         el('button', { type: 'button', class: 'link', onclick: () => removeAccount(a) }, '연결 해제')));
   }
@@ -288,6 +301,7 @@
     const azureMissing = provider === 'azure' && !CONFIG.AZURE_CLIENT_ID;
     $('azure-missing').hidden = !azureMissing;
     $('cloud-submit').disabled = azureMissing;
+    $('cloud-beta-note').hidden = !K.isBeta(provider);
     $('cloud-submit').textContent = SUBMIT_LABEL[provider] || '연결 확인';
     const item = catalogItem(provider);
     $('cloud-manual-row').hidden = !(item && item.plans && item.plans.length);
@@ -300,7 +314,10 @@
     for (const radio of form().elements.provider) {
       radio.checked = radio.value === provider;
       radio.disabled = Boolean(id) && radio.value !== provider;
+      // 이미 연결된 Azure를 다시 연결할 때(provider === 'azure')는 앱 ID가 없어도 선택지를 남긴다.
+      radio.closest('label').hidden = radio.value !== provider && !K.isConnectable(radio.value, CONFIG);
     }
+    markBetaChoices();
     $('cloud-dialog-title').textContent = id ? `${PROVIDER_LABEL[provider]} 다시 연결` : '사용료 연결';
     showPanel(provider);
     $('cloud-dialog').showModal();
@@ -390,6 +407,9 @@
   });
   $('cloud-form').addEventListener('change', (e) => { if (e.target.name === 'provider') showPanel(e.target.value); });
   $('cloud-form').addEventListener('submit', submitDialog);
+  for (const chip of document.querySelectorAll('.provider-chips li[data-provider]')) {
+    if (!K.isConnectable(chip.dataset.provider, CONFIG)) chip.remove();
+  }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;

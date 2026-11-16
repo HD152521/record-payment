@@ -1,7 +1,7 @@
 /* 탭별로 결제 흐름을 추적해 하나의 기록으로 합친다.
    결제창 팝업(새 탭)은 원래 탭에 묶어서 "어느 사이트에서 등록했는지"를 유지한다. */
 importScripts(
-  'lib/detect.js', 'lib/ledger.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js',
+  'lib/detect.js', 'lib/ledger.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js', 'lib/onboarding.js',
   'lib/cloud/config.js', 'lib/cloud/costs.js', 'lib/cloud/sigv4.js',
   'lib/cloud/aws.js', 'lib/cloud/azure.js', 'lib/cloud/openai.js',
   'lib/cloud/cloudflare.js', 'lib/cloud/github.js', 'lib/cloud/vercel.js', 'lib/cloud/service.js',
@@ -289,3 +289,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 PaymentCloudService.install();
 PaymentReminderService.install();
 PaymentAutofetchWatch.install();
+
+// 설치 직후에만 대시보드를 열어 첫 실행 안내를 보여 준다(업데이트 때는 열지 않는다).
+chrome.runtime.onInstalled.addListener((details) => {
+  PaymentOnboarding.handleInstalled(details, {
+    loadSettings: PaymentSettings.loadSettings,
+    saveSettings: PaymentSettings.saveSettings,
+    openDashboard: () => chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard.html#home') }),
+  }).catch((err) => console.error('[결제 기록장]', err));
+});

@@ -84,7 +84,7 @@ try {
   await dash.check('#remind-form [name=enabled]');
   await dash.waitForFunction(() => /알림을 켰어요/.test(document.querySelector('#settings-status').textContent));
   const settings = await worker.evaluate(() => chrome.storage.local.get('settings').then((s) => s.settings));
-  assert.deepEqual(settings, { budgetKRW: 10000, remind: { enabled: true, daysBefore: 3 } });
+  assert.deepEqual({ budgetKRW: settings.budgetKRW, remind: settings.remind }, { budgetKRW: 10000, remind: { enabled: true, daysBefore: 3 } });
 
   // 5) 백업 받기 → 기록을 비운 뒤 파일에서 가져오기 → 돌아온다. 연결 키는 파일에 없다
   await worker.evaluate(() => chrome.storage.local.set({ cloudAccounts: [{ id: 'a1', credentials: { secretAccessKey: 'SECRET-SHOULD-NOT-LEAK' } }] }));

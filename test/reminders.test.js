@@ -49,9 +49,9 @@ test('보낸 기록은 40일 지난 것부터 지운다', () => {
 test('설정은 범위 밖 값을 기본값으로 되돌린다', () => {
   assert.deepEqual(ST.normalizeSettings(undefined), ST.DEFAULT_SETTINGS);
   assert.deepEqual(ST.normalizeSettings({ budgetKRW: '150000', remind: { enabled: true, daysBefore: 3 } }),
-    { budgetKRW: 150000, remind: { enabled: true, daysBefore: 3 } });
+    { budgetKRW: 150000, remind: { enabled: true, daysBefore: 3 }, onboarding: { started: false, dismissed: false } });
   assert.deepEqual(ST.normalizeSettings({ budgetKRW: -5, remind: { enabled: 'yes', daysBefore: 99 } }),
-    { budgetKRW: null, remind: { enabled: false, daysBefore: 1 } });
+    { budgetKRW: null, remind: { enabled: false, daysBefore: 1 }, onboarding: { started: false, dismissed: false } });
 });
 
 test('예산 상태는 80% 넘으면 주의, 100% 넘으면 초과', () => {

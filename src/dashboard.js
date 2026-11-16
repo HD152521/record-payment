@@ -46,19 +46,12 @@
     : K.coveredBy(r, cloudView().connected) != null);
   const summarize = () => L.summarize(records, Date.now(), { isCovered });
 
-  function cloudParts() {
-    const view = cloudView();
-    if (!view.accounts.length) return { now: 0, projected: 0, hasUnconverted: false };
-    return { now: view.total.monthToDate, projected: Math.max(view.total.projected, view.total.monthToDate), hasUnconverted: view.hasUnconverted };
-  }
+  const cloudParts = () => globalThis.PaymentForecast.cloudParts(
+    cloudOverview(cloud.costs, cloud.meta), Date.now(), globalThis.PaymentCloudCosts.billingWindow(Date.now()).thisKey);
 
   function renderHeadline(s, usdKrw) {
     const cloudNow = cloudParts();
-    const paid = L.krwTotal(s.paidThisMonth, usdKrw);
-    const due = L.krwTotal(s.dueThisMonth, usdKrw);
-    const unconverted = L.krwTotal(s.thisMonth, usdKrw).unconverted;
-    const paidKRW = paid.krw + cloudNow.now;
-    const dueKRW = due.krw + (cloudNow.projected - cloudNow.now);
+    const { paidKRW, dueKRW, unconverted } = globalThis.PaymentForecast.monthForecast(s, cloudNow, usdKrw);
     $('monthly-total').textContent = joinMoney(paidKRW + dueKRW, unconverted);
     renderDelta(paidKRW + dueKRW, usdKrw);
     renderBudget(paidKRW + dueKRW);

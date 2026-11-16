@@ -6,19 +6,25 @@
   const MAX_BUDGET = 10_000_000_000;
   const MAX_DAYS_BEFORE = 7;
   const WARN_RATIO = 0.8;
-  const DEFAULT_SETTINGS = Object.freeze({ budgetKRW: null, remind: Object.freeze({ enabled: false, daysBefore: 1 }) });
+  const DEFAULT_SETTINGS = Object.freeze({
+    budgetKRW: null,
+    remind: Object.freeze({ enabled: false, daysBefore: 1 }),
+    onboarding: Object.freeze({ started: false, dismissed: false }),
+  });
 
   function normalizeSettings(input) {
     const s = input && typeof input === 'object' ? input : {};
     const budget = Math.round(Number(s.budgetKRW));
     const remind = s.remind && typeof s.remind === 'object' ? s.remind : {};
     const days = Number(remind.daysBefore);
+    const onboarding = s.onboarding && typeof s.onboarding === 'object' ? s.onboarding : {};
     return {
       budgetKRW: s.budgetKRW != null && s.budgetKRW !== '' && budget > 0 && budget <= MAX_BUDGET ? budget : null,
       remind: {
         enabled: remind.enabled === true,
         daysBefore: Number.isInteger(days) && days >= 0 && days <= MAX_DAYS_BEFORE ? days : DEFAULT_SETTINGS.remind.daysBefore,
       },
+      onboarding: { started: onboarding.started === true, dismissed: onboarding.dismissed === true },
     };
   }
 

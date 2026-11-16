@@ -306,3 +306,20 @@ td.edit .link:hover { background: var(--paper-sunk); }
   .ledger td.edit { grid-column: 2; grid-row: 2 / span 3; align-self: end; }
   .chart-card { padding: 14px 12px 12px; }
 }
+
+/* ── 첫 실행 안내 ─────────────────────────────────────────── */
+.onboarding {
+  padding: 22px 24px; margin-bottom: 24px; border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper-raised));
+}
+.onboarding-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.onboarding-steps li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.onboarding-steps .step-mark {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--rule); font-size: 13px; font-weight: 600;
+}
+.onboarding-steps .is-done .step-mark { background: var(--accent); border-color: var(--accent); color: var(--paper-raised); }
+.onboarding-steps .step-text { display: grid; gap: 2px; font-size: 14px; }
+.onboarding-steps .is-done .step-text b { text-decoration: line-through; color: var(--ink-soft); }
+.onboarding-steps .step-state { font-size: 13px; color: var(--ink-soft); }
+.onboarding-foot { margin-top: 14px; display: flex; justify-content: flex-end; }

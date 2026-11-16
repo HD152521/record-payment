@@ -67,6 +67,8 @@
   }
 
   async function ensureOriginRule() {
+    // Azure를 다시 켤 때 manifest에 declarativeNetRequestWithHostAccess·identity 권한도 되돌려 넣는다.
+    if (!chrome.declarativeNetRequest) throw new Error('이 버전에서는 Azure 연결을 쉬고 있어요');
     await chrome.declarativeNetRequest.updateSessionRules({
       removeRuleIds: [ORIGIN_RULE_ID],
       addRules: [{

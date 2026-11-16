@@ -130,7 +130,7 @@ try {
   const pop = await context.newPage();
   await pop.setViewportSize({ width: 360, height: 420 });
   await pop.goto(`chrome-extension://${extId}/src/popup.html`);
-  await pop.waitForSelector('#recent li');
+  await pop.waitForSelector('#upcoming li');
   await pop.screenshot({ path: path.join(SHOT_DIR, 'popup.png') });
 
   console.log('E2E 통과');

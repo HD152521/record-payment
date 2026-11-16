@@ -7,6 +7,7 @@
   const S = globalThis.PaymentStore;
   const K = globalThis.PaymentCatalog;
   const Q = globalThis.PaymentQuickAdd;
+  const CONFIG = globalThis.PaymentCloudConfig;
   const { el, toast, radioChip, checkedValue, checkRadio } = globalThis.PaymentUI;
   const $ = (id) => document.getElementById(id);
   const ALL = 'all';
@@ -51,7 +52,7 @@
     const chips = [{ id: ALL, label: '전체' }, ...K.CATEGORIES].map((c) =>
       el('button', { type: 'button', 'aria-pressed': String(c.id === category), onclick: () => { category = c.id; renderList(); } }, c.label));
     $('picker-cats').replaceChildren(...chips);
-    const items = K.search(form().elements.q.value, category === ALL ? null : category);
+    const items = K.search(form().elements.q.value, category === ALL ? null : category, CONFIG);
     $('picker-list').replaceChildren(...items.map(itemButton));
     $('picker-empty').hidden = items.length > 0;
   }
@@ -180,7 +181,7 @@
   form().elements.q.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const [first] = K.search(e.target.value, category === ALL ? null : category);
+    const [first] = K.search(e.target.value, category === ALL ? null : category, CONFIG);
     if (e.target.value.trim() && first) { toggle(first); e.target.value = ''; renderList(); }
   });
   $('tray-dates').addEventListener('change', (e) => {
