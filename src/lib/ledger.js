@@ -7,6 +7,7 @@
   const MAX_EVIDENCE = 8;
   const MAX_CYCLE_STEPS = 2000;
   const UPCOMING_DAYS = 30;
+  const SOON_DAYS = 7;
   const DAY_MS = 24 * 60 * 60 * 1000;
 
   const KIND_LABEL = { subscription: '구독', one_time: '일회성', card_registered: '결제수단 등록', unknown: '미확인' };
@@ -16,8 +17,9 @@
     return {
       id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       site: '', kind: 'unknown', cycle: null, amount: null, currency: null,
-      card: null, pg: null, trial: false, status: 'active', note: '',
-      userEdited: false, evidence: [], startedAt: now, createdAt: now, updatedAt: now,
+      card: null, pg: null, trial: false, status: 'active', canceledAt: null, note: '',
+      // 자동 감지는 결제 "시도"라 사용자가 확인하기 전까지 합계에 넣지 않는다.
+      review: 'pending', userEdited: false, evidence: [], startedAt: now, createdAt: now, updatedAt: now,
       ...fields,
     };
   }
@@ -49,6 +51,17 @@
 
   const isActiveSubscription = (r) => r.kind === 'subscription' && r.status === 'active';
 
+  // review가 없던 예전 기록은 사용자가 고친 것만 확인된 것으로 본다.
+  function isConfirmed(r) {
+    if (r.review === 'confirmed') return true;
+    if (r.review === 'pending') return false;
+    return r.userEdited === true;
+  }
+
+  function markConfirmed(r, now = Date.now()) {
+    return { ...r, review: 'confirmed', userEdited: true, updatedAt: now };
+  }
+
   function monthlyEquivalent(r) {
     if (!isActiveSubscription(r) || r.amount == null) return 0;
     return r.amount * (MONTH_FACTOR[r.cycle] ?? 1);
@@ -69,10 +82,30 @@
     return d;
   }
 
+  /** 결제일(startedAt = 첫 결제일, 체험이면 체험 끝나는 날)부터 주기마다 [from, to) 안에 드는 날짜들. */
+  function scheduleDates(r, from, to) {
+    const cycle = r.cycle || 'monthly';
+    const dates = [];
+    for (let k = 0; k < MAX_CYCLE_STEPS; k += 1) {
+      const d = addCycles(r.startedAt, cycle, k);
+      if (d.getTime() >= to) break;
+      if (d.getTime() >= from) dates.push(d);
+    }
+    return dates;
+  }
+
+  const canceledAtOf = (r) => (r.status === 'canceled' ? (r.canceledAt ?? r.updatedAt ?? 0) : Infinity);
+
+  /** 실제로 빠져나가는(나갈) 결제일. 해지했으면 해지한 때까지만. */
+  function chargeDates(r, from, to) {
+    if (r.kind !== 'subscription') return [];
+    return scheduleDates(r, from, Math.min(to, canceledAtOf(r) + 1));
+  }
+
   function nextChargeDate(r, now = Date.now()) {
     if (!isActiveSubscription(r)) return null;
     const cycle = r.cycle || 'monthly';
-    for (let k = 1; k < MAX_CYCLE_STEPS; k += 1) {
+    for (let k = 0; k < MAX_CYCLE_STEPS; k += 1) {
       const d = addCycles(r.startedAt, cycle, k);
       if (d.getTime() > now) return d;
     }
@@ -88,28 +121,79 @@
     }, {});
   }
 
-  function isSameMonth(ts, now) {
-    const a = new Date(ts);
-    const b = new Date(now);
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+  function monthRange(now) {
+    const d = new Date(now);
+    return [new Date(d.getFullYear(), d.getMonth(), 1).getTime(), new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime()];
   }
 
-  function summarize(records, now = Date.now()) {
-    const subs = records.filter(isActiveSubscription);
-    const monthly = sumByCurrency(subs, monthlyEquivalent);
-    const upcoming = subs
+  const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+
+  function upcomingOf(subs, now) {
+    return subs
       .map((record) => ({ record, date: nextChargeDate(record, now) }))
       .filter(({ date }) => date && date.getTime() - now <= UPCOMING_DAYS * DAY_MS)
+      .map((u) => ({ ...u, isTrialEnd: Boolean(u.record.trial) && sameDay(u.date, u.record.startedAt) }))
       .sort((a, b) => a.date - b.date);
+  }
+
+  const startOfDay = (ts) => {
+    const d = new Date(ts);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  /** 오늘부터 며칠 뒤인지(달력 날짜 기준, 오늘 = 0) */
+  const daysUntil = (date, now) => Math.round((startOfDay(date) - startOfDay(now)) / DAY_MS);
+
+  /**
+   * 이번 달 돈을 나간 돈(오늘까지의 결제일·일회성)과 나갈 돈(남은 결제일·미리 적은 일회성)으로 나눈다.
+   * 오늘이 결제일이면 나간 돈으로 본다.
+   */
+  function splitThisMonth(counted, now) {
+    const [from, to] = monthRange(now);
+    const cut = Math.min(to, startOfDay(now) + DAY_MS);
+    const subs = counted.filter((r) => r.kind === 'subscription');
+    const oneTime = counted.filter((r) => r.kind === 'one_time' && r.startedAt >= from && r.startedAt < to);
+    const charged = (a, b) => (r) => (r.amount || 0) * chargeDates(r, a, b).length;
+    const merge = (x, y) => Object.entries(y).reduce((acc, [cur, v]) => ({ ...acc, [cur]: Math.round(((acc[cur] || 0) + v) * 100) / 100 }), x);
+    const paid = merge(sumByCurrency(subs, charged(from, cut)), sumByCurrency(oneTime.filter((r) => r.startedAt < cut), (r) => r.amount));
+    const due = merge(sumByCurrency(subs, charged(cut, to)), sumByCurrency(oneTime.filter((r) => r.startedAt >= cut), (r) => r.amount));
+    return { paid, due, total: merge(paid, due), oneTime };
+  }
+
+  // 해지한 뒤 올해 지나간 결제일만큼 아낀 돈
+  function savedThisYear(records, now) {
+    const yearStart = new Date(new Date(now).getFullYear(), 0, 1).getTime();
+    const canceled = records.filter((r) => r.kind === 'subscription' && r.status === 'canceled');
+    return sumByCurrency(canceled, (r) => {
+      const from = Math.max(yearStart, canceledAtOf(r) + 1);
+      return (r.amount || 0) * scheduleDates(r, from, now + 1).length;
+    });
+  }
+
+  /**
+   * 합계 규칙: 확인된 기록만, 사용료 연결 값에 포함된 기록(isCovered)은 빼고 센다.
+   * thisMonth = 이번 달 결제일이 든 구독 + 이번 달 일회성. monthly = 월 평균(연간은 1/12).
+   */
+  function summarize(records, now = Date.now(), { isCovered = () => false } = {}) {
+    const confirmed = records.filter(isConfirmed);
+    const counted = confirmed.filter((r) => !isCovered(r));
+    const subs = counted.filter(isActiveSubscription);
+    const monthly = sumByCurrency(subs, monthlyEquivalent);
+    const split = splitThisMonth(counted, now);
+    const upcoming = upcomingOf(subs, now);
+    const soon = upcoming.filter((u) => daysUntil(u.date, now) <= SOON_DAYS);
     return {
+      thisMonth: split.total,
+      paidThisMonth: split.paid,
+      dueThisMonth: split.due,
+      soon: sumByCurrency(soon.map((u) => u.record), (r) => r.amount),
       monthly,
       yearly: Object.fromEntries(Object.entries(monthly).map(([c, v]) => [c, Math.round(v * 12 * 100) / 100])),
-      oneTimeThisMonth: sumByCurrency(
-        records.filter((r) => r.kind === 'one_time' && isSameMonth(r.createdAt, now)),
-        (r) => r.amount,
-      ),
+      oneTimeThisMonth: sumByCurrency(split.oneTime, (r) => r.amount),
+      savedThisYear: savedThisYear(counted, now),
       activeSubscriptions: subs.length,
       cardRegistrations: records.filter((r) => r.kind === 'card_registered').length,
+      pending: records.filter((r) => !isConfirmed(r) && (r.kind === 'subscription' || r.kind === 'one_time')),
+      covered: confirmed.filter(isCovered),
       upcoming,
     };
   }
@@ -135,6 +219,15 @@
   const RECORD_CURRENCIES = ['KRW', 'USD'];
   const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
   const finiteOr = (v, fallback) => (Number.isFinite(v) ? v : fallback);
+  // 결제 페이지 주소의 쿼리·조각에는 세션 토큰·결제 콜백 값이 섞일 수 있어 origin만 남긴다.
+  function originOnly(url) {
+    try {
+      const u = new URL(String(url));
+      return /^https?:$/.test(u.protocol) ? u.origin : undefined;
+    } catch {
+      return undefined;
+    }
+  }
 
   /** 대시보드에서 들어온 기록을 저장 전에 모양대로 맞춘다. 화면이 깨지지 않게 타입·길이를 고정한다. */
   function sanitizeRecord(input) {
@@ -150,7 +243,7 @@
       ...createRecord({}, now),
       id: r.id,
       site,
-      siteUrl: text(r.siteUrl, 500) || undefined,
+      siteUrl: originOnly(text(r.siteUrl, 500)),
       kind: RECORD_KINDS.includes(r.kind) ? r.kind : 'unknown',
       cycle: RECORD_CYCLES.includes(r.cycle) ? r.cycle : null,
       amount,
@@ -159,7 +252,9 @@
       pg: text(r.pg, 40) || null,
       trial: r.trial === true,
       status: r.status === 'canceled' ? 'canceled' : 'active',
+      canceledAt: r.status === 'canceled' ? finiteOr(r.canceledAt, finiteOr(r.updatedAt, now)) : null,
       note: text(r.note, 200),
+      review: isConfirmed(r) ? 'confirmed' : 'pending',
       userEdited: r.userEdited === true,
       evidence: Array.isArray(r.evidence) ? r.evidence.filter((e) => typeof e === 'string').map((e) => e.slice(0, 120)).slice(-MAX_EVIDENCE) : [],
       startedAt: finiteOr(r.startedAt, now),
@@ -193,7 +288,7 @@
 
   /** 카드별로 사용 중인 구독 수와 월 환산 금액. 등록 안 했지만 기록에 나온 카드도 보여 준다. */
   function cardSummary(records, cards) {
-    const used = records.filter((r) => isActiveSubscription(r) && r.card && r.card.last4);
+    const used = records.filter((r) => isActiveSubscription(r) && isConfirmed(r) && r.card && r.card.last4);
     const seen = used
       .map((r) => r.card)
       .filter((card, i, list) => list.findIndex((c) => c.last4 === card.last4) === i)
@@ -223,7 +318,8 @@
 
   const api = {
     KIND_LABEL, CYCLE_LABEL, createRecord, mergeRecord, monthlyEquivalent,
-    nextChargeDate, summarize, formatMoney, toCsv, krwTotal, sanitizeRecord, normalizeCard, upsertCard, cardSummary,
+    nextChargeDate, summarize, formatMoney, isConfirmed, markConfirmed, toCsv, krwTotal, sanitizeRecord, normalizeCard, upsertCard, cardSummary,
+    chargeDates, monthRange, isActiveSubscription, originOnly, daysUntil, SOON_DAYS,
   };
   root.PaymentLedger = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

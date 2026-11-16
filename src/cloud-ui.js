@@ -6,15 +6,20 @@
   const L = globalThis.PaymentLedger;
   const C = globalThis.PaymentCloudCosts;
   const CONFIG = globalThis.PaymentCloudConfig;
-  const { el, formatTime, cloudOverview } = globalThis.PaymentUI;
+  const { el, formatTime, cloudOverview, toast, withFallbackFx } = globalThis.PaymentUI;
   const $ = (id) => document.getElementById(id);
   const PROVIDER_LABEL = { aws: 'AWS', azure: 'Azure', openai: 'OpenAI', cloudflare: 'Cloudflare', github: 'GitHub', vercel: 'Vercel' };
   const TOP_SERVICES = 3;
   const SUBMIT_LABEL = { azure: 'Microsoft로 로그인' };
+  const G = globalThis.PaymentCloudGuides;
+  const STEP_TITLES = { azure: ['로그인 안내', '로그인하기'] };
+  const DEFAULT_STEP_TITLES = ['토큰 만들기', '붙여 넣기'];
+  const COPY_TEXT = { awsPolicy: () => JSON.stringify(globalThis.PaymentCloudAWS.POLICY, null, 2) };
+  const COPIED_MS = 1500;
   const K = globalThis.PaymentCatalog;
   const catalogItem = (provider) => K.ITEMS.find((i) => i.connect === provider);
 
-  let state = { costs: {}, meta: {} };
+  let state = { costs: {}, meta: withFallbackFx({}) };
   let replaceId = null;
 
   async function send(type, payload) {
@@ -28,15 +33,21 @@
     return currency !== 'KRW' && krw != null ? `≈ ${L.formatMoney(krw, 'KRW')}` : '';
   };
 
+  const AWS_REFRESH_NOTE = 'AWS는 갱신 1번에 $0.01이 내 AWS 계정에 청구돼요. 자동 갱신은 하루 한 번만 해요.';
+
   function renderTotals(view) {
     const { total } = view;
     $('cloud-total').textContent = L.formatMoney(total.monthToDate, 'KRW');
     $('cloud-sub').textContent = view.accounts.length
       ? [`월말 예상 ${L.formatMoney(total.projected, 'KRW')}`, `지난달 ${L.formatMoney(total.lastMonth, 'KRW')}`,
-        view.usdKrw && `환율 1달러 ${Math.round(view.usdKrw).toLocaleString('ko-KR')}원`,
+        view.usdKrw && `환율 1달러 ${Math.round(view.usdKrw).toLocaleString('ko-KR')}원${state.meta.fxFallback ? '(참고)' : ''}`,
         view.hasUnconverted && '일부는 환율이 없어 빠짐'].filter(Boolean).join(' · ')
       : '';
     $('cloud-updated').textContent = view.lastRefreshAt ? `마지막 갱신 ${formatTime(view.lastRefreshAt)} · 매일 아침 ${CONFIG.REFRESH_HOUR}시` : '';
+    // AWS는 조회가 유료라(내 AWS 계정에 청구) 직접 갱신할 때마다 든다는 걸 버튼 옆에 적어 둔다.
+    const hasAws = view.accounts.some((a) => a.provider === 'aws');
+    $('cloud-refresh-note').hidden = !hasAws;
+    $('cloud-refresh').title = hasAws ? AWS_REFRESH_NOTE : '';
   }
 
   function figure(label, amount, currency) {
@@ -102,7 +113,173 @@
   const form = () => $('cloud-form');
   const selectedProvider = () => form().elements.provider.value;
 
+  // ── 2단계: 안내서(데이터는 lib/cloud/guides.js) ──────────────
+  async function copyText(text, btn) {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '복사됨';
+    setTimeout(() => { btn.textContent = '복사'; }, COPIED_MS);
+  }
+
+  function codeCopy(text) {
+    const btn = el('button', { type: 'button', class: 'btn ghost small', onclick: () => copyText(text, btn).catch(showError) }, '복사');
+    return el('div', { class: 'code-copy' }, el('pre', {}, text), btn);
+  }
+
+  function guidePart(part) {
+    if (typeof part === 'string') return part;
+    if (part.b) return el('b', {}, part.b);
+    if (part.code) return el('code', {}, part.code);
+    if (part.href) return el('a', { href: part.href, target: '_blank', rel: 'noopener' }, part.a);
+    if (part.file) return el('a', { href: chrome.runtime.getURL(part.file), download: part.file.split('/').pop() }, part.a);
+    if (part.copy && COPY_TEXT[part.copy]) return codeCopy(COPY_TEXT[part.copy]());
+    return null;
+  }
+
+  const guideOpts = () => ({ templateUrl: CONFIG.AWS_TEMPLATE_URL });
+
+  function renderGuide(provider) {
+    const guide = G.guideFor(provider, guideOpts());
+    const [step2, step3] = STEP_TITLES[provider] || DEFAULT_STEP_TITLES;
+    $('cloud-step2-title').textContent = step2;
+    $('cloud-step3-title').textContent = step3;
+    $('cloud-open-create').hidden = !guide.openLabel;
+    $('cloud-open-create').textContent = `${guide.openLabel} ↗`;
+    $('cloud-prefill-note').hidden = !guide.prefilled;
+    $('cloud-guide').replaceChildren(...guide.steps.map((step) => el('li', {}, step.map(guidePart))));
+    $('cloud-links').replaceChildren('바로가기 ', ...guide.links.flatMap((link, i) => [
+      i > 0 ? ' · ' : '',
+      el('a', { href: link.url, target: '_blank', rel: 'noopener' }, link.label),
+    ]));
+  }
+
+  // ── 3단계: 토큰 자동 받기. 토큰은 background에만 있고 화면엔 가린 값만 온다 ──────
+  const autofill = () => $('cloud-autofill');
+
+  function hideAutofill() {
+    autofill().hidden = true;
+    autofill().replaceChildren();
+  }
+
+  function showAutofillWaiting() {
+    autofill().replaceChildren(el('p', { class: 'hint' }, '새 탭에서 토큰을 만들면 여기로 자동으로 가져와요. 안 되면 아래 칸에 붙여 넣어 주세요.'));
+    autofill().hidden = false;
+  }
+
+  function autofillExtra(provider, f) {
+    if (provider === 'github') return { org: f.ghOrg.value };
+    if (provider === 'cloudflare') return { accountId: f.cfAccountId.value };
+    if (provider === 'vercel') return { team: f.vcTeam.value };
+    return {};
+  }
+
+  async function confirmAutofill(provider, buttons) {
+    buttons.forEach((b) => { b.disabled = true; });
+    setStatus('받은 토큰으로 비용을 불러 보는 중…');
+    try {
+      const f = form().elements;
+      await send('cloud:autofetch-confirm', { provider, label: f.label.value, extra: autofillExtra(provider, f), replaceId });
+      $('cloud-dialog').close();
+    } catch (err) {
+      setStatus(`${err.message} 토큰을 아래에 붙여 넣어 다시 해 볼 수 있어요.`, true);
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  function declineAutofill() {
+    hideAutofill();
+    send('cloud:autofetch-cancel', {}).catch(showError);
+    setStatus('받은 토큰은 지웠어요. 아래에 붙여 넣어 주세요.');
+  }
+
+  function showAutofillFound(provider, preview) {
+    const yes = el('button', { type: 'button', class: 'btn', id: 'cloud-autofill-yes' }, '연결하기');
+    const no = el('button', { type: 'button', class: 'btn ghost', id: 'cloud-autofill-no', onclick: declineAutofill }, '아니요, 붙여 넣을게요');
+    yes.addEventListener('click', () => confirmAutofill(provider, [yes, no]));
+    autofill().replaceChildren(
+      el('p', { class: 'autofill-q' }, '이 토큰으로 연결할까요? ', el('code', {}, preview)),
+      el('p', { class: 'hint' }, '연결하기를 누르기 전에는 저장하지 않아요.'),
+      el('div', { class: 'autofill-actions' }, yes, no));
+    autofill().hidden = false;
+  }
+
+  function onAutofetchFound(msg) {
+    const isOpen = $('cloud-dialog').open && selectedProvider() === msg.provider;
+    if (isOpen && typeof msg.preview === 'string') showAutofillFound(msg.provider, msg.preview);
+  }
+
+  // 사용자가 이미 로그인한 콘솔에서 토큰 만들기 화면을 새 탭으로 연다. background가 그 탭만 지켜본다.
+  async function openCreatePage() {
+    const provider = selectedProvider();
+    const org = provider === 'github' ? form().elements.ghOrg.value : '';
+    const url = G.createUrl(provider, { ...guideOpts(), org });
+    if (!url) return;
+    try {
+      const tab = await chrome.tabs.create({ url });
+      await send('cloud:autofetch-watch', { tabId: tab.id, provider });
+      showAutofillWaiting();
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  // ── GitHub 로그인(device flow). 코드를 보여 주고, 승인될 때까지 이 창에서 기다린다 ──
+  let ghLogin = null; // 진행 중인 로그인의 AbortController
+
+  function stopGithubLogin() {
+    if (ghLogin) ghLogin.abort();
+    ghLogin = null;
+    $('gh-device').hidden = true;
+    $('gh-device').replaceChildren();
+  }
+
+  function showDeviceCode(device) {
+    $('gh-device').replaceChildren(
+      el('p', {}, '이 코드를 GitHub에 넣고 승인해 주세요. ', el('code', { id: 'gh-user-code' }, device.userCode)),
+      el('p', { class: 'hint' },
+        el('a', { href: device.verificationUri, target: '_blank', rel: 'noopener' }, '코드 넣는 화면 열기 ↗'),
+        ' · 승인하면 자동으로 연결돼요.'));
+    $('gh-device').hidden = false;
+  }
+
+  async function startGithubLogin() {
+    stopGithubLogin();
+    const controller = new AbortController();
+    ghLogin = controller;
+    const Gh = globalThis.PaymentCloudGitHub;
+    const clientId = CONFIG.GITHUB_CLIENT_ID;
+    const targetId = replaceId;
+    $('gh-login').disabled = true;
+    setStatus('GitHub에서 코드를 받는 중…');
+    try {
+      const device = await Gh.requestDeviceCode({ clientId });
+      showDeviceCode(device);
+      setStatus('GitHub 승인을 기다리는 중…');
+      const tokens = await Gh.pollForToken({ clientId, device, signal: controller.signal });
+      if (controller.signal.aborted) return; // 기다리는 사이 창을 닫았으면 저장하지 않는다
+      setStatus('로그인 확인됨. 비용을 불러오는 중…');
+      const f = form().elements;
+      const org = f.ghOrg.value.trim() || undefined;
+      await send('cloud:add', { provider: 'github', label: f.label.value, credentials: { ...tokens, org }, replaceId: targetId });
+      $('cloud-dialog').close();
+    } catch (err) {
+      if (err.name !== 'AbortError') setStatus(err.message, true);
+    } finally {
+      $('gh-login').disabled = false;
+      if (ghLogin === controller) ghLogin = null;
+    }
+  }
+
+  function showGithubLogin(provider) {
+    stopGithubLogin();
+    const hasApp = Boolean(CONFIG.GITHUB_CLIENT_ID);
+    $('gh-login').hidden = provider !== 'github' || !hasApp;
+    $('gh-login-missing').hidden = provider !== 'github' || hasApp;
+  }
+
   function showPanel(provider) {
+    renderGuide(provider);
+    hideAutofill();
+    showGithubLogin(provider);
     for (const panel of form().querySelectorAll('fieldset[data-panel]')) {
       const active = panel.dataset.panel === provider;
       panel.hidden = !active;
@@ -189,40 +366,42 @@
     }
   }
 
-  async function copyPolicy() {
-    await navigator.clipboard.writeText($('aws-policy').textContent);
-    $('aws-policy-copy').textContent = '복사됨';
-    setTimeout(() => { $('aws-policy-copy').textContent = '복사'; }, 1500);
-  }
-
   function showError(err) {
     console.error('[결제 기록장]', err);
-    alert(err.message || '처리하지 못했어요. 다시 시도해 주세요.');
+    toast(err.message || '처리하지 못했어요. 다시 시도해 주세요.', { isError: true });
   }
 
   globalThis.PaymentCloudUI = { openDialog };
 
-  $('aws-policy').textContent = JSON.stringify(globalThis.PaymentCloudAWS.POLICY, null, 2);
-  $('aws-policy-copy').addEventListener('click', () => copyPolicy().catch(showError));
+  $('cloud-open-create').addEventListener('click', openCreatePage);
   $('cloud-add').addEventListener('click', () => openDialog());
   $('cloud-refresh').addEventListener('click', refreshNow);
   $('cloud-cancel').addEventListener('click', () => $('cloud-dialog').close());
   $('cloud-manual').addEventListener('click', recordManually);
-  $('cloud-dialog').addEventListener('close', () => form().reset());
+  $('gh-login').addEventListener('click', startGithubLogin);
+  $('cloud-dialog').addEventListener('close', () => {
+    form().reset();
+    hideAutofill();
+    stopGithubLogin();
+    send('cloud:autofetch-cancel', {}).catch((err) => console.error('[결제 기록장]', err)); // 읽은 토큰·감시를 남기지 않는다
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg && msg.type === 'cloud:autofetch-found') onAutofetchFound(msg);
+  });
   $('cloud-form').addEventListener('change', (e) => { if (e.target.name === 'provider') showPanel(e.target.value); });
   $('cloud-form').addEventListener('submit', submitDialog);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.cloudCosts) state = { ...state, costs: changes.cloudCosts.newValue || {} };
-    if (changes.cloudMeta) state = { ...state, meta: changes.cloudMeta.newValue || {} };
+    if (changes.cloudMeta) state = { ...state, meta: withFallbackFx(changes.cloudMeta.newValue) };
     if (changes.cloudCosts || changes.cloudMeta) render();
   });
 
   chrome.storage.local.get(['cloudCosts', 'cloudMeta']).then((stored) => {
-    state = { costs: stored.cloudCosts || {}, meta: stored.cloudMeta || {} };
+    state = { costs: stored.cloudCosts || {}, meta: withFallbackFx(stored.cloudMeta) };
     render();
-    // 오래된 값이면 background가 알아서 다시 가져온다(6시간 이내면 건너뜀).
+    // 오래된 연결만 background가 다시 가져온다(무료 서비스는 6시간, AWS는 하루 기준).
     if (Object.keys(state.costs).length) send('cloud:refresh', {}).catch((err) => console.error('[결제 기록장]', err));
   }).catch(showError);
 })();

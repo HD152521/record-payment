@@ -99,6 +99,16 @@
     return ITEMS.find((item) => h === item.site || h.endsWith(`.${item.site}`)) || null;
   }
 
+  // GitHub 사용량 보고서에 요금제·Copilot 구독료가 들어가는지 실계정으로 확인 전이라 덮지 않는다.
+  const COVERS_PLAN_FEES = new Set(['aws', 'azure', 'openai', 'cloudflare', 'vercel']);
+
+  /** 사용료 연결 값이 이 기록을 이미 포함하면 그 연결 id. 같은 돈이 두 번 더해지지 않게 한다. */
+  function coveredBy(record, connectedProviders) {
+    const item = findBySite(record && record.site);
+    const id = item && item.connect;
+    return id && COVERS_PLAN_FEES.has(id) && connectedProviders.has(id) ? id : null;
+  }
+
   /** 고른 플랫폼·요금제를 기록 양식에 넣을 값으로 바꾼다. 요금제가 없으면 금액은 비워 둔다. */
   function recordFields(item, plan) {
     return {
@@ -111,7 +121,7 @@
     };
   }
 
-  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, findBySite, recordFields };
+  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, findBySite, recordFields, coveredBy };
   root.PaymentCatalog = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

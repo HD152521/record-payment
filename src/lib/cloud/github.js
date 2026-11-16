@@ -10,8 +10,10 @@
   const TOKEN_RE = /^(ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,})$/;
   const NAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
-  function validateCredentials({ token, org } = {}) {
-    if (!TOKEN_RE.test(String(token || '').trim())) {
+  function validateCredentials(credentials = {}) {
+    const { token, org } = credentials;
+    if (isLogin(credentials)) validateLogin(credentials);
+    else if (!TOKEN_RE.test(String(token || '').trim())) {
       throw new Error('GitHub 개인 액세스 토큰(github_pat_ 또는 ghp_로 시작)을 붙여 넣어 주세요.');
     }
     if (org && !NAME_RE.test(String(org).trim())) throw new Error('조직 이름은 영문·숫자·하이픈만 돼요.');
@@ -47,27 +49,132 @@
     return `${API}/users/${login}/settings/billing/usage`;
   }
 
-  async function fetchEntries(account, { fetchImpl = fetch, now = Date.now() } = {}) {
-    const { token, org } = account.credentials;
+  async function readUsage(fetchImpl, token, org, now) {
     const headers = {
       authorization: `Bearer ${token.trim()}`,
       accept: 'application/vnd.github+json',
       'x-github-api-version': API_VERSION,
     };
+    const base = await usageBase(fetchImpl, headers, org);
+    const entries = [];
+    for (const m of monthsToRead(now)) {
+      const json = await C.requestJson(fetchImpl, `${base}?year=${m.year}&month=${m.month}`, { headers }, 'GitHub');
+      entries.push(...parseEntries(json, m.key));
+    }
+    return entries;
+  }
+
+  async function fetchEntries(account, { fetchImpl = fetch, now = Date.now(), githubClientId = '' } = {}) {
+    if (isLogin(account.credentials)) return fetchWithLogin(account, { fetchImpl, now, clientId: githubClientId });
+    const { token, org } = account.credentials;
     try {
-      const base = await usageBase(fetchImpl, headers, org);
-      const entries = [];
-      for (const m of monthsToRead(now)) {
-        const json = await C.requestJson(fetchImpl, `${base}?year=${m.year}&month=${m.month}`, { headers }, 'GitHub');
-        entries.push(...parseEntries(json, m.key));
-      }
-      return { entries };
+      return { entries: await readUsage(fetchImpl, token, org, now) };
     } catch (err) {
       throw explainError(err, org && org.trim());
     }
   }
 
-  const api = { id: 'github', label: 'GitHub', validateCredentials, parseEntries, fetchEntries };
+  // ── GitHub 로그인(GitHub App device flow). 클라이언트 비밀키 없이 client_id만 쓴다 ──
+  const LOGIN = 'https://github.com/login';
+  const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
+  const UAT_RE = /^ghu_[A-Za-z0-9]{20,}$/;
+  const REFRESH_RE = /^ghr_[A-Za-z0-9]{20,}$/;
+  const SLOW_DOWN_SECONDS = 5;
+  const REFRESH_MARGIN_MS = 5 * 60 * 1000; // 만료 5분 전이면 미리 갱신
+  const DEVICE_ERRORS = {
+    device_flow_disabled: '이 GitHub 앱은 기기 연결(device flow)이 꺼져 있어요. 앱 설정에서 켜 주세요.',
+    access_denied: 'GitHub에서 연결을 취소했어요. 다시 하려면 로그인 버튼을 눌러 주세요.',
+    expired_token: '코드가 만료됐어요. 로그인 버튼을 다시 눌러 새 코드를 받아 주세요.',
+    incorrect_client_credentials: 'GitHub 앱 ID가 맞지 않아요. 배포자에게 알려 주세요.',
+  };
+
+  const isLogin = (credentials) => Boolean(credentials && credentials.accessToken);
+
+  function validateLogin({ accessToken, refreshToken }) {
+    const bad = !UAT_RE.test(String(accessToken)) || (refreshToken != null && !REFRESH_RE.test(String(refreshToken)));
+    if (bad) throw new Error('GitHub 로그인 토큰이 올바르지 않아요. 다시 로그인해 주세요.');
+  }
+
+  function postForm(fetchImpl, path, params) {
+    const init = { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params).toString() };
+    return C.requestJson(fetchImpl, `${LOGIN}/${path}`, init, 'GitHub 로그인');
+  }
+
+  const deviceError = (code, fallback) => new Error(DEVICE_ERRORS[code] || `GitHub 로그인에 실패했어요 (${String(fallback || code).slice(0, 100)}).`);
+
+  /** 1단계: 사용자에게 보여줄 코드를 받는다. */
+  async function requestDeviceCode({ clientId, fetchImpl = fetch } = {}) {
+    if (!clientId) throw new Error('이 설치본에는 GitHub 앱 ID가 없어요.');
+    const json = (await postForm(fetchImpl, 'device/code', { client_id: clientId })) || {};
+    if (json.error) throw deviceError(json.error, json.error_description);
+    const uri = String(json.verification_uri || '');
+    if (!uri.startsWith('https://github.com/')) throw new Error('GitHub가 알려 준 코드 입력 주소가 이상해요. 다시 시도해 주세요.');
+    return { deviceCode: json.device_code, userCode: json.user_code, verificationUri: uri, expiresIn: Number(json.expires_in), interval: Number(json.interval) };
+  }
+
+  function credentialsFromToken(json, now, previousRefresh) {
+    const refreshToken = json.refresh_token || previousRefresh;
+    const expiresIn = Number(json.expires_in);
+    return {
+      accessToken: json.access_token,
+      ...(refreshToken ? { refreshToken } : {}),
+      ...(Number.isFinite(expiresIn) && expiresIn > 0 ? { expiresAt: now + expiresIn * 1000 } : {}),
+    };
+  }
+
+  function abortError() {
+    const err = new Error('GitHub 로그인을 멈췄어요.');
+    err.name = 'AbortError';
+    return err;
+  }
+
+  const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  /** 2단계: 사용자가 코드를 넣고 승인할 때까지 interval 간격으로 묻는다. */
+  async function pollForToken({ clientId, device, fetchImpl = fetch, sleep = defaultSleep, now = Date.now, signal = null }) {
+    const deadline = now() + device.expiresIn * 1000;
+    let interval = device.interval || SLOW_DOWN_SECONDS;
+    for (;;) {
+      await sleep(interval * 1000);
+      if (signal && signal.aborted) throw abortError();
+      if (now() >= deadline) throw new Error(DEVICE_ERRORS.expired_token);
+      const json = (await postForm(fetchImpl, 'oauth/access_token', { client_id: clientId, device_code: device.deviceCode, grant_type: DEVICE_GRANT })) || {};
+      if (json.access_token) return credentialsFromToken(json, now());
+      if (json.error === 'slow_down') interval = Number(json.interval) || interval + SLOW_DOWN_SECONDS;
+      else if (json.error !== 'authorization_pending') throw deviceError(json.error, json.error_description);
+    }
+  }
+
+  function needsReauthError() {
+    const err = new Error('GitHub 로그인이 만료됐어요. 다시 로그인해 주세요.');
+    err.needsReauth = true;
+    return err;
+  }
+
+  // 토큰이 만료(8시간)됐으면 갱신 토큰으로 새 쌍을 받는다. device flow 토큰은 갱신에도 비밀키가 필요 없다.
+  async function freshCredentials(credentials, { fetchImpl, now, clientId }) {
+    const { refreshToken, expiresAt } = credentials;
+    if (!refreshToken || (expiresAt && now < expiresAt - REFRESH_MARGIN_MS)) return null;
+    if (!clientId) throw new Error('이 설치본에는 GitHub 앱 ID가 없어서 로그인을 이어 갈 수 없어요.');
+    const json = (await postForm(fetchImpl, 'oauth/access_token', { client_id: clientId, grant_type: 'refresh_token', refresh_token: refreshToken })) || {};
+    if (!json.access_token) throw needsReauthError();
+    return { ...credentials, ...credentialsFromToken(json, now, refreshToken) };
+  }
+
+  async function fetchWithLogin(account, { fetchImpl, now, clientId }) {
+    const refreshed = await freshCredentials(account.credentials, { fetchImpl, now, clientId });
+    const accountPatch = refreshed ? { credentials: refreshed } : null;
+    const { accessToken, org } = refreshed || account.credentials;
+    try {
+      return { entries: await readUsage(fetchImpl, accessToken, org, now), accountPatch };
+    } catch (err) {
+      const out = err.status === 401 ? needsReauthError() : explainError(err, org && org.trim());
+      out.accountPatch = accountPatch; // 갱신된 토큰은 실패해도 저장해야 다음에 쓸 수 있다
+      throw out;
+    }
+  }
+
+  const api = { id: 'github', label: 'GitHub', validateCredentials, parseEntries, fetchEntries, requestDeviceCode, pollForToken };
   root.PaymentCloudGitHub = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

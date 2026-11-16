@@ -184,3 +184,29 @@ test('openai.validateCredentials requires an admin key', () => {
   assert.throws(() => openai.validateCredentials({ adminKey: 'sk-proj-abc' }), /관리자/);
   assert.doesNotThrow(() => openai.validateCredentials({ adminKey: 'sk-admin-abc123' }));
 });
+
+// 자동 갱신 대상: AWS는 조회 1번에 $0.01이라 하루 한 번만, 나머지는 무료라 6시간마다.
+test('dueAccounts refreshes AWS at most once a day but free providers every few hours', () => {
+  const HOUR = 60 * 60 * 1000;
+  const month = C.billingWindow(NOW).thisKey;
+  const accounts = [{ id: 'a', provider: 'aws' }, { id: 'o', provider: 'openai' }];
+  const fetched = (ago) => ({ month, fetchedAt: NOW - ago });
+  const ids = (costs, maxAge = 6 * HOUR) => C.dueAccounts(accounts, costs, NOW, maxAge).map((a) => a.id);
+
+  assert.deepEqual(ids({ a: fetched(7 * HOUR), o: fetched(7 * HOUR) }), ['o']);
+  assert.deepEqual(ids({ a: fetched(21 * HOUR), o: fetched(1 * HOUR) }), ['a']);
+  // 아침 알람(1시간 기준)이어도 AWS는 하루 안 지났으면 건너뛴다
+  assert.deepEqual(ids({ a: fetched(5 * HOUR), o: fetched(2 * HOUR) }, HOUR), ['o']);
+  // 처음 연결했거나 달이 바뀌면 바로
+  assert.deepEqual(ids({ o: fetched(0) }), ['a']);
+  assert.deepEqual(ids({ a: { month: '2026-10', fetchedAt: NOW - HOUR }, o: fetched(0) }), ['a']);
+  // 실패한 무료 서비스는 30분 뒤, AWS는 6시간 뒤 다시
+  const failed = (ago, extra = {}) => ({ ...fetched(2 * HOUR), error: 'x', failedAt: NOW - ago, ...extra });
+  assert.deepEqual(ids({ a: fetched(0), o: failed(31 * 60 * 1000) }), ['o']);
+  assert.deepEqual(ids({ a: failed(31 * 60 * 1000), o: fetched(0) }), []);
+  assert.deepEqual(ids({ a: failed(6 * HOUR), o: fetched(0) }), ['a']);
+  // 달이 바뀐 뒤 실패해도(지난달 month가 남음) 대기 시간을 지킨다
+  assert.deepEqual(ids({ a: failed(HOUR, { month: '2026-10' }), o: fetched(0) }), []);
+  // 한 번도 못 받은 AWS 키도 마찬가지
+  assert.deepEqual(ids({ a: { error: 'x', failedAt: NOW - HOUR }, o: fetched(0) }), []);
+});

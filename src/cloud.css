@@ -1,6 +1,5 @@
 /* 클라우드 칸: 가계부 위에 붙은 "공과금 고지서" 묶음. 서비스 색은 카드 왼쪽 띠에만 쓴다. */
 :root {
-  --cloud: #0f6b5c;
   --provider-aws: #b35c00;
   --provider-azure: #1f5fbf;
   --provider-openai: #2b2b2b;
@@ -11,7 +10,6 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --cloud: #6fd3bd;
     --provider-aws: #ffad5c;
     --provider-azure: #8db8ff;
     --provider-openai: #d8d2c4;
@@ -22,81 +20,107 @@
   }
 }
 
-.cloud { padding: 28px 0 32px; border-bottom: 3px double var(--rule-strong); }
-.cloud-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 20px; }
+.cloud {
+  position: relative; margin-top: 24px; padding: 28px 28px 24px;
+  background: var(--paper-raised); border-radius: var(--radius-xl); box-shadow: var(--shadow); overflow: hidden;
+}
+.cloud-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
+.cloud-accounts:not(:empty) { margin-top: 20px; }
 .cloud-head h2 { margin: 0; }
 .cloud-total {
   margin: 4px 0 0;
-  font-family: var(--font-mono);
-  font-size: clamp(32px, 5vw, 52px);
-  font-weight: 700;
+  font-size: clamp(28px, 3.6vw, 38px);
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.03em;
-  color: var(--cloud);
+  letter-spacing: -0.04em;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.cloud-sub { margin: 8px 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); }
+.cloud-sub { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.cloud-sub:empty { display: none; }
 .cloud-updated { font-size: 12px; }
-.btn:disabled { opacity: 0.5; cursor: progress; transform: none; box-shadow: none; }
-.btn.small { padding: 3px 10px; font-size: 12px; }
 
 .cloud-accounts {
   list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
 }
 .cloud-card {
-  --accent: var(--ink-soft);
+  --provider-color: var(--ink-soft);
   position: relative;
   display: flex; flex-direction: column; gap: 10px;
-  padding: 16px 16px 12px 20px;
+  padding: 18px 18px 14px;
   background: var(--paper-raised);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  transition: transform var(--duration) var(--ease);
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-l);
+  transition: transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
-.cloud-card::before {
-  content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
-  border-radius: var(--radius) 0 0 var(--radius); background: var(--accent);
-}
-.cloud-card:hover { transform: translateY(-2px); }
-.provider-aws { --accent: var(--provider-aws); }
-.provider-azure { --accent: var(--provider-azure); }
-.provider-openai { --accent: var(--provider-openai); }
-.provider-cloudflare { --accent: var(--provider-cloudflare); }
-.provider-github { --accent: var(--provider-github); }
-.provider-vercel { --accent: var(--provider-vercel); }
+.cloud-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.provider-aws { --provider-color: var(--provider-aws); }
+.provider-azure { --provider-color: var(--provider-azure); }
+.provider-openai { --provider-color: var(--provider-openai); }
+.provider-cloudflare { --provider-color: var(--provider-cloudflare); }
+.provider-github { --provider-color: var(--provider-github); }
+.provider-vercel { --provider-color: var(--provider-vercel); }
 .cloud-card header { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.badge.provider { color: var(--accent); }
+.badge.provider { color: var(--provider-color); }
 .cloud-label { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-mtd { margin: 0; font-family: var(--font-mono); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cloud-mtd { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .cloud-mtd small, .figures small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--ink-soft); }
-.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 8px 0; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); }
+.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
 .figures dt { font-size: 12px; color: var(--ink-soft); }
-.figures dd { margin: 0; font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+.figures dd { margin: 0; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .figures small { display: block; margin: 0; }
 .cloud-card .receipt li { padding: 4px 0; font-size: 13px; }
 .cloud-card footer { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-top: auto; }
 .cloud-card .error, .status.error { margin: 0; color: var(--danger); font-size: 13px; }
 .cloud-card .warn { margin: 0; color: var(--warn); font-size: 12px; }
-.cloud-card.has-error { outline: 1.5px dashed var(--danger); outline-offset: -1.5px; }
-.cloud .empty { padding: 24px 0 8px; }
+.cloud-card.has-error { outline: 1.5px solid color-mix(in srgb, var(--danger) 55%, transparent); outline-offset: -1.5px; }
+.cloud .empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 18px 0 0; padding: 14px 16px; text-align: left; background: var(--paper-sunk); border: 0; border-radius: var(--radius); font-size: 13px; }
+.cloud .empty[hidden] { display: none; }
+.provider-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.provider-chips li { padding: 2px 9px; border-radius: 999px; background: var(--paper-sunk); color: var(--ink); font-size: 12px; font-weight: 600; }
 
 /* 연결 대화상자 */
-#cloud-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+#cloud-dialog { width: min(560px, calc(100vw - 32px)); }
 #cloud-dialog fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 /* 서비스가 6개라 3칸씩 두 줄. 칸 사이 선은 gap 1px 위로 비치는 바탕색으로 그린다. */
-.segmented {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-  background: var(--rule); border: 1.5px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+.provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+.provider-grid label {
+  position: relative; flex-direction: row; justify-content: center; margin: 0; padding: 12px 0; cursor: pointer;
+  font-size: 14px; font-weight: 700; color: var(--ink-soft);
+  background: var(--paper-raised); border: 1.5px solid var(--rule); border-radius: var(--radius);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
-.segmented label { flex-direction: row; justify-content: center; margin: 0; padding: 7px 0; cursor: pointer; font-size: 14px; background: var(--paper-raised); }
-.segmented input { position: absolute; opacity: 0; pointer-events: none; }
-.segmented label:has(input:checked) { background: var(--ink); color: var(--paper); }
-.segmented label:has(input:focus-visible) { outline: 2px solid var(--kind-subscription); outline-offset: -3px; }
-.segmented label:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+.provider-grid label:hover { border-color: var(--rule-strong); color: var(--ink); }
+.provider-grid input { position: absolute; opacity: 0; pointer-events: none; }
+.provider-grid label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.provider-grid label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.provider-grid label:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+/* 마법사: 1 서비스 고르기 → 2 토큰 만들기 → 3 붙여 넣기 */
+.wizard-step { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; font-weight: 700; }
+.step-no {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none;
+  border-radius: 50%; background: var(--accent); color: var(--on-accent);
+  font-family: var(--font-mono); font-size: 11px;
+}
+.wizard-guide { margin-bottom: 16px; padding: 14px 16px; background: var(--paper-sunk); border: 0; border-radius: var(--radius); }
+.wizard-open { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.wizard-open .hint { margin: 0; }
+.wizard-links { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.wizard-links a { color: var(--accent); }
+.wizard-autofill { margin-bottom: 12px; padding: 10px 12px; border-left: 3px solid var(--cloud); background: var(--paper); border-radius: var(--radius); }
+.wizard-autofill .hint { margin: 0; }
+.autofill-q { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.autofill-q code { font-family: var(--font-mono); font-size: 13px; font-weight: 400; overflow-wrap: anywhere; }
+.autofill-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.gh-login { margin-bottom: 12px; }
+.gh-login .hint { margin: 0; }
+.gh-device { margin-top: 8px; padding: 10px 12px; border-left: 3px solid var(--cloud); background: var(--paper); border-radius: var(--radius); }
+.gh-device p { margin: 0 0 4px; font-size: 14px; }
+.gh-device code { font-family: var(--font-mono); font-size: 18px; font-weight: 600; letter-spacing: 0.08em; }
 .steps { margin: 0 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.6; }
 .steps li { margin-bottom: 6px; }
-.steps a { color: var(--kind-subscription); }
+.steps a { color: var(--accent); }
 .steps code { font-family: var(--font-mono); font-size: 12px; }
 .code-copy { position: relative; margin-top: 6px; }
 .code-copy pre {
@@ -108,3 +132,7 @@
 #cloud-dialog label .muted { font-weight: 400; }
 .hint { margin: 0 0 12px; font-size: 12px; color: var(--ink-soft); }
 .status { min-height: 1.2em; margin: 0 0 12px; font-size: 13px; color: var(--ink-soft); }
+
+/* AWS 조회 비용 안내: 연결 전에 눈에 띄게 */
+.hint.cost-note { padding: 10px 12px; border-radius: var(--radius-s); background: var(--accent-soft); color: var(--ink); line-height: 1.5; }
+.hint.cost-note b { font-weight: 700; }

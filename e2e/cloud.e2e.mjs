@@ -61,7 +61,7 @@ try {
   const pageErrors = [];
   dash.on('pageerror', (e) => pageErrors.push(e.message));
   await dash.setViewportSize({ width: 1280, height: 900 });
-  await dash.goto(`chrome-extension://${extId}/src/dashboard.html`);
+  await dash.goto(`chrome-extension://${extId}/src/dashboard.html#cloud`);
   await dash.waitForSelector('#cloud-empty:not([hidden])');
 
   // 1) 틀린 형식의 키는 저장하지 않고 이유를 보여준다
@@ -82,7 +82,7 @@ try {
 
   // 3) OpenAI: 프로젝트 키는 거절, 관리자 키는 통과
   await dash.click('#cloud-add');
-  await dash.click('.segmented label:has(input[value=openai])');
+  await dash.click('.provider-grid label:has(input[value=openai])');
   assert.equal(await dash.isVisible('input[name=accessKeyId]'), false, '다른 서비스 입력칸은 숨겨져야 한다');
   await dash.fill('input[name=adminKey]', 'sk-proj-abc');
   await dash.click('#cloud-submit');
@@ -103,11 +103,11 @@ try {
 
   // 5) Azure: 앱 ID가 없으면 버튼이 막히고 안내가 보인다
   await dash.click('#cloud-add');
-  await dash.click('.segmented label:has(input[value=azure])');
+  await dash.click('.provider-grid label:has(input[value=azure])');
   assert.equal(await dash.isDisabled('#cloud-submit'), true);
   assert.equal(await dash.isVisible('#azure-missing'), true);
   await dash.screenshot({ path: path.join(SHOT_DIR, 'cloud-dialog-azure.png') });
-  await dash.click('.segmented label:has(input[value=aws])');
+  await dash.click('.provider-grid label:has(input[value=aws])');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'cloud-dialog-aws.png') });
   await dash.click('#cloud-cancel');
 
