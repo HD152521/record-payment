@@ -37,7 +37,7 @@
 
   function renderTotals(view) {
     const { total } = view;
-    $('cloud-total').textContent = L.formatMoney(total.monthToDate, 'KRW');
+    globalThis.PaymentMotion.countUp($('cloud-total'), total.monthToDate, (n) => L.formatMoney(n, 'KRW'));
     $('cloud-sub').textContent = view.accounts.length
       ? [`월말 예상 ${L.formatMoney(total.projected, 'KRW')}`, `지난달 ${L.formatMoney(total.lastMonth, 'KRW')}`,
         view.usdKrw && `환율 1달러 ${Math.round(view.usdKrw).toLocaleString('ko-KR')}원${state.meta.fxFallback ? '(참고)' : ''}`,

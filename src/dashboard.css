@@ -183,6 +183,13 @@ td.site { font-weight: 600; overflow-wrap: anywhere; }
   border-radius: 9px; font-size: 15px; font-weight: 800; text-transform: uppercase;
   color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent);
 }
+/* 서비스 로고: 확장 안 SVG를 마스크로 칠한다(외부 이미지 없음). 글자 아바타는 이름에서 만든 색 */
+.avatar.brand.has-icon { background: color-mix(in srgb, var(--brand) 12%, transparent); position: relative; }
+.avatar.brand.has-icon::before {
+  content: ''; width: 58%; height: 58%; background: var(--brand);
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat;
+}
+.avatar.brand.is-letter { background: var(--brand); color: #fff; }
 tr.is-canceled td { color: var(--ink-soft); }
 tr.is-canceled .num { text-decoration: line-through; }
 tr.is-excluded td.num { text-decoration: line-through; color: var(--ink-soft); }
@@ -226,6 +233,7 @@ td.edit .link:hover { background: var(--paper-sunk); }
 .chart .bar { outline: none; cursor: default; }
 .chart .bar:hover .hit, .chart .bar:focus-visible .hit { fill: var(--paper-sunk); }
 .chart .bar:focus-visible .hit { stroke: var(--accent); stroke-width: 2; }
+.chart-tip[hidden] { display: none; }
 .chart-tip {
   position: absolute; top: 48px; left: 20px; z-index: 2; pointer-events: none;
   display: grid; gap: 2px; min-width: 170px; padding: 10px 12px;
@@ -275,6 +283,16 @@ td.edit .link:hover { background: var(--paper-sunk); }
 .data-zone h2 { color: var(--danger); }
 #settings-status { margin: 4px 0 0; min-height: 1.4em; }
 .status.error { color: var(--danger); }
+.stmt-panel { display: grid; gap: 10px; justify-content: stretch; align-items: stretch; }
+.stmt-panel[hidden] { display: none; }
+.stmt-panel h3 { margin: 0; font-size: 14px; }
+.stmt-pick { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; }
+.stmt-pick label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.stmt-pick select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: var(--radius-s); border: 1.5px solid transparent; background: var(--paper-sunk); color: var(--ink); }
+.stmt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.stmt-list label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-s); background: var(--paper-sunk); cursor: pointer; }
+.stmt-list input { width: 16px; height: 16px; accent-color: var(--accent); }
+.stmt-list .muted { margin-left: auto; font-size: 12px; }
 .wipe-list { margin: 0 0 14px; padding: 12px 14px 12px 32px; background: var(--paper-sunk); border-radius: var(--radius); font-size: 14px; }
 .wipe-list b { font-variant-numeric: tabular-nums; }
 #wipe-dialog h2 { color: var(--danger); }

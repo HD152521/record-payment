@@ -63,7 +63,39 @@
     });
   }
 
-  const api = { MAX_BATCH, dateChoices, preferredCard, buildRecords };
+  // IT인이 많이 쓰는 것: 처음 화면에 먼저 보여 준다(연결 화면으로 가는 곳은 제외)
+  const POPULAR_IDS = ['chatgpt', 'claude', 'cursor', 'midjourney', 'notion', 'figma', 'docker', 'netflix', 'youtube', 'spotify'];
+
+  function popularItems() {
+    return POPULAR_IDS.map((id) => K.ITEMS.find((i) => i.id === id)).filter((i) => i && !i.connect);
+  }
+
+  /** 누르면 바로 담기는 기본값: 첫 요금제(없으면 금액 비움) */
+  function defaultSelection(item) {
+    return { item, planIndex: item.plans && item.plans.length ? 0 : null, amount: '' };
+  }
+
+  /** 고른 것의 월 환산 합계(원). 달러는 환율로 바꾸고, 금액을 모르는 것은 0으로 둔다. */
+  function monthlyTotalKRW(selections, usdKrw) {
+    const byCurrency = selections.reduce((acc, { item, planIndex = null, amount }) => {
+      const plan = item.plans && planIndex != null ? item.plans[planIndex] || null : null;
+      const f = K.recordFields(item, plan);
+      const value = plan ? f.amount : parseAmount(amount);
+      const monthly = L.monthlyEquivalent({ kind: 'subscription', status: 'active', cycle: f.cycle, amount: value });
+      return monthly ? { ...acc, [f.currency]: (acc[f.currency] || 0) + monthly } : acc;
+    }, {});
+    return L.krwTotal(byCurrency, usdKrw).krw;
+  }
+
+  /** 주 버튼 문구 */
+  function submitLabel(selections, usdKrw) {
+    if (!selections.length) return '추가';
+    const total = monthlyTotalKRW(selections, usdKrw);
+    const count = `${selections.length}개 추가`;
+    return total > 0 ? `${count} · 월 ${L.formatMoney(total, 'KRW')}` : count;
+  }
+
+  const api = { MAX_BATCH, POPULAR_IDS, dateChoices, preferredCard, buildRecords, popularItems, defaultSelection, monthlyTotalKRW, submitLabel };
   root.PaymentQuickAdd = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

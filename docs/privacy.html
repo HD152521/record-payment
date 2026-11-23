@@ -29,7 +29,7 @@
 <body>
 <main>
   <h1>결제 기록장 개인정보 처리방침</h1>
-  <p class="meta">시행일 2026년 11월 16일 · 대상: 크롬 확장프로그램 "결제 기록장"</p>
+  <p class="meta">시행일 2026년 11월 19일 · 대상: 크롬 확장프로그램 "결제 기록장"</p>
 
   <p class="summary"><b>요약</b> · 결제 기록장은 개발자 서버가 없습니다. 모든 기록과 연결 키는 <b>사용자의 브라우저 안에만</b> 저장되고, 개발자를 포함한 누구에게도 보내지 않습니다. 광고·분석 도구도 쓰지 않습니다.</p>
 
@@ -38,14 +38,17 @@
   <ul>
     <li><b>결제 기록</b>: 사이트 도메인, 날짜, 유형(구독·일회성·결제수단 등록), 결제 주기, 금액, 결제대행사 이름, 카드 브랜드와 <b>끝 4자리</b>, 사용자가 적은 메모</li>
     <li><b>내 카드</b>: 카드 브랜드, 끝 4자리, 사용자가 붙인 이름</li>
+    <li><b>이용내역 후보</b>: 카드 이용내역 파일에서 반복 결제로 찾은 가맹점 이름, 금액, 날짜, 카드 끝 4자리(확인 전 "확인할 기록"으로 저장)</li>
     <li><b>설정</b>: 월 예산, 결제 알림 설정</li>
     <li><b>서버·API 사용료 연결</b>: 사용자가 직접 연결한 서비스(AWS·OpenAI·Cloudflare·GitHub·Vercel)의 읽기용 키 또는 로그인 토큰, 그리고 받아 온 사용료 숫자와 원/달러 환율</li>
   </ul>
-  <p><b>저장하지 않는 정보</b>: 전체 카드번호, 유효기간, CVC, 비밀번호, 방문한 페이지의 본문.</p>
+  <p><b>저장하지 않는 정보</b>: 전체 카드번호, 유효기간, CVC, 비밀번호, 방문한 페이지의 본문, 이용내역 파일의 원문.</p>
 
   <h2>2. 웹페이지에서 읽는 것</h2>
   <ul>
     <li>결제 순간을 자동으로 기록하려고 모든 페이지에서 <b>카드번호 입력칸과 결제 버튼 클릭</b>만 감지합니다. 그때 화면 글자에서 금액·주기·구독 여부를 뽑고, 카드번호 입력칸에서는 끝 4자리만 남깁니다. 페이지 원문은 저장하거나 보내지 않습니다.</li>
+    <li><b>구독 계정 페이지 읽기</b>: Netflix·YouTube Premium·Spotify·Claude·GitHub의 결제 화면에서만 요금제 이름, 가격, 다음 결제일을 읽어요. 읽은 값은 "결제 기록장에 추가할까요?" 안내에 보여 주고, 사용자가 추가를 누른 경우에만 "확인할 기록"으로 저장해요. 거절하면 그 사이트는 30일 동안 다시 묻지 않아요(사이트 이름과 거절한 날짜만 저장).</li>
+    <li><b>이용내역 파일 가져오기</b>: 사용자가 고른 카드 이용내역 파일은 브라우저 안에서만 읽어요. 파일을 외부로 보내지 않고, 반복 결제 후보만 저장해요.</li>
     <li><b>토큰 자동 받기</b>: 사용자가 연결 화면의 버튼으로 연 탭 하나에서만, 그 서비스의 공식 콘솔(예: <code>platform.openai.com</code>, <code>github.com</code>)에 새로 만든 토큰이 보이면 그 값을 읽습니다. 사용자가 "연결하기"를 누르기 전에는 저장하지 않으며, 다른 탭과 사이트는 읽지 않습니다.</li>
   </ul>
 
@@ -74,7 +77,7 @@
   <table>
     <tr><th>권한</th><th>이유</th></tr>
     <tr><td><code>storage</code></td><td>기록·설정·연결 키를 브라우저 안에 저장</td></tr>
-    <tr><td>모든 사이트 접근, <code>webNavigation</code></td><td>어느 사이트에서 결제했는지 감지하고, 결제창 팝업·결제대행사 이동을 원래 사이트 기록으로 묶음</td></tr>
+    <tr><td>모든 사이트 접근, <code>webNavigation</code></td><td>어느 사이트에서 결제했는지 감지하고, 결제창 팝업·결제대행사 이동을 원래 사이트 기록으로 묶음. 구독 계정 결제 화면 5곳에서만 요금제·가격·다음 결제일을 읽음</td></tr>
     <tr><td><code>scripting</code></td><td>토큰 자동 받기: 사용자가 연 서비스 콘솔 탭에서만 토큰을 읽음</td></tr>
     <tr><td><code>alarms</code></td><td>매일 아침 사용료 갱신, 결제일 알림 시각 맞추기</td></tr>
     <tr><td><code>notifications</code></td><td>결제일·체험 종료 알림</td></tr>
@@ -84,7 +87,7 @@
   <p>이 방침이 바뀌면 이 페이지의 시행일을 고칩니다. 문의는 <a href="https://github.com/HD152521/record-payment/issues">GitHub 이슈</a>로 남겨 주세요.</p>
 
   <h2>English summary</h2>
-  <p class="en">Payment Tracker has no developer server. All records, card brand and last 4 digits, settings and the read-only keys you connect are stored only in your browser (<code>chrome.storage.local</code>). Requests go only to the official APIs of services you choose to connect and to a public exchange-rate API (open.er-api.com). We do not sell, share or transfer user data to third parties, do not use it for purposes unrelated to the extension's single purpose, and do not use it for creditworthiness or lending. The use of information complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. AWS Cost Explorer charges $0.01 per request to your own AWS account; automatic refresh is limited to once a day.</p>
+  <p class="en">Payment Tracker has no developer server. All records, card brand and last 4 digits, settings and the read-only keys you connect are stored only in your browser (<code>chrome.storage.local</code>). Requests go only to the official APIs of services you choose to connect and to a public exchange-rate API (open.er-api.com). On Netflix, YouTube Premium, Spotify, Claude and GitHub billing pages it reads only the plan, price and next charge date, and saves them only after you confirm. Card statement files are read in the browser only and their contents are never stored or sent. We do not sell, share or transfer user data to third parties, do not use it for purposes unrelated to the extension's single purpose, and do not use it for creditworthiness or lending. The use of information complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. AWS Cost Explorer charges $0.01 per request to your own AWS account; automatic refresh is limited to once a day.</p>
 </main>
 </body>
 </html>

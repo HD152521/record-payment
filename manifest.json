@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "결제 기록장",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "어디서 결제수단을 등록했는지, 매달 얼마 나가는지 기록하고 AWS·OpenAI·Cloudflare·GitHub·Vercel 사용료를 매일 아침 모아 봅니다.",
   "permissions": [
     "storage",
@@ -23,6 +23,8 @@
       ],
       "js": [
         "src/lib/detect.js",
+        "src/lib/account-reader.js",
+        "src/account-prompt.js",
         "src/content.js"
       ],
       "all_frames": true,

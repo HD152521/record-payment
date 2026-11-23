@@ -17,6 +17,7 @@ const USER_CODE = 'WDJB-MJHT';
 const TEMPLATE_URL = 'https://s3.us-east-1.amazonaws.com/example-bucket/readonly-cost-user.json';
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,

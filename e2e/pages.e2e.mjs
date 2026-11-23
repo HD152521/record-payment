@@ -9,6 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOT_DIR = path.join(ROOT, 'e2e', 'screenshots');
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,
@@ -51,6 +52,16 @@ try {
   // 지난달: 넷플릭스 13,500 + 서버 $30 × 1,400 = 55,500 → 이번 달이 42,000원 적다
   await dash.waitForFunction(() => /지난달\(55,500원\)보다 42,000원 적어요/.test(document.querySelector('#month-delta').textContent));
 
+  // 1-1) 움직임을 켠 사람: 금액은 0에서 올라가 같은 값에서 멈추고, 곧 나갈 돈 목록은 차례로 나타난다
+  await dash.emulateMedia({ reducedMotion: 'no-preference' });
+  await dash.reload();
+  // 0원과 끝값 사이의 값이 한 번은 보여야 카운트업이다
+  await dash.waitForFunction(() => /^[1-9][\d,]*원$/.test(document.querySelector('#monthly-total').textContent)
+    && document.querySelector('#monthly-total').textContent !== '13,500원');
+  await dash.waitForFunction(() => document.querySelector('#monthly-total').textContent === '13,500원');
+  await dash.waitForSelector('#upcoming-list li.stagger-in');
+  await dash.emulateMedia({ reducedMotion: 'reduce' });
+
   // 2) 달마다: 12달 막대, 확인 대기 기록은 빠진다
   await dash.click('#tabs a[data-page=trends]');
   await dash.waitForFunction(() => document.querySelectorAll('#trend-chart .bar').length === 12);
@@ -68,6 +79,26 @@ try {
   await dash.waitForFunction(() => document.querySelectorAll('#trend-chart .bar').length === 6);
   assert.match(await dash.textContent('#top-list li:first-child'), /netflix\.com.*81,000원/);
   assert.match(await dash.textContent('#trend-stats'), /6개월 합계/);
+
+  // 2-b) 나눠 보기: 분류별로 바꾸면 계열이 바뀌고 같은 달 합계는 그대로, 새로고침 뒤에도 유지
+  const totalBefore = await dash.locator('#trend-chart .bar').nth(3).getAttribute('aria-label').then((s) => s.match(/합계 ([\d,]+원)/)[1]);
+  await dash.click('#trend-view button[data-view=category]');
+  await dash.waitForFunction(() => /생활 구독/.test(document.querySelector('#trend-legend').textContent));
+  assert.match(await dash.textContent('#trend-legend'), /기타/, '카탈로그에 없는 기록은 기타');
+  assert.match(await dash.textContent('#trend-legend'), /서버·API/);
+  assert.match(await dash.locator('#trend-chart .bar').nth(3).getAttribute('aria-label'), new RegExp(`합계 ${totalBefore}`));
+  await dash.locator('#trend-chart .bar').nth(3).hover();
+  await dash.waitForSelector('#trend-tip:not([hidden])');
+  assert.match(await dash.textContent('#trend-tip'), /생활 구독/);
+  await dash.waitForFunction(() => chrome.storage.local.get('settings').then((s) => s.settings && s.settings.trendView === 'category'));
+  await dash.reload();
+  await dash.click('#tabs a[data-page=trends]');
+  await dash.waitForFunction(() => document.querySelector('#trend-view button[data-view=category]').getAttribute('aria-pressed') === 'true');
+  await dash.waitForFunction(() => /생활 구독/.test(document.querySelector('#trend-legend').textContent));
+  await dash.click('#trend-view button[data-view=card]');
+  await dash.waitForFunction(() => /카드 안 정함/.test(document.querySelector('#trend-legend').textContent));
+  await dash.click('#trend-view button[data-view=all]');
+  await dash.waitForFunction(() => document.querySelectorAll('#trend-legend li').length === 3);
 
   // 3) 예산: 이번 달 13,500원인데 예산 10,000원이면 초과
   await dash.click('#tabs a[data-page=settings]');
@@ -109,6 +140,7 @@ try {
   // 모바일
   await dash.setViewportSize({ width: 375, height: 800 });
   await dash.click('#tabs a[data-page=trends]');
+  await dash.click('#trend-range button[data-months="6"]');
   await dash.waitForFunction(() => document.querySelectorAll('#trend-chart .bar').length === 6);
   await dash.screenshot({ path: path.join(SHOT_DIR, 'trends-mobile.png'), fullPage: true });
 

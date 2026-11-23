@@ -17,7 +17,7 @@
   // 홈과 같은 규칙: 확인된 기록만, 사용료 연결에 이미 든 서비스는 빼고, 서버·API는 월말 예상까지 더한다.
   function renderHeadline(s, cloud, usdKrw) {
     const { paidKRW, dueKRW, totalKRW, unconverted } = F.monthForecast(s, cloud, usdKrw);
-    $('total').textContent = joinMoney(totalKRW, unconverted);
+    globalThis.PaymentMotion.countUp($('total'), totalKRW, (n) => joinMoney(n, unconverted));
     $('paid-bar').hidden = totalKRW <= 0;
     $('paid-fill').style.width = totalKRW > 0 ? `${Math.round((paidKRW / totalKRW) * 100)}%` : '0%';
     $('paid-bar').setAttribute('aria-label', `나간 돈 ${money(paidKRW)}, 나갈 돈 ${money(dueKRW)}`);
@@ -41,6 +41,7 @@
         el('span', { class: 'what' }, record.site),
         el('span', { class: 'amount' }, L.formatMoney(record.amount, record.currency))))
       : [el('li', { class: 'empty' }, '30일 안에 나갈 결제가 없어요')]));
+    globalThis.PaymentMotion.staggerIn($('upcoming'));
   }
 
   function render(records, { cloudCosts, cloudMeta }) {

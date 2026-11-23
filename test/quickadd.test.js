@@ -84,3 +84,37 @@ test('잘못된 금액·너무 많은 선택은 받지 않는다', () => {
   const many = Array.from({ length: Q.MAX_BATCH + 1 }, () => ({ item: item('gcp') }));
   assert.throws(() => Q.buildRecords(many, { card: null, startedAt: day(11, 1), now: NOW }), /한 번에/);
 });
+
+test('처음 보여 줄 목록: 8~10개, 실제 카탈로그에 있고 연결 화면으로 가는 곳은 없다', () => {
+  const list = Q.popularItems();
+  assert.ok(list.length >= 8 && list.length <= 10, `count ${list.length}`);
+  assert.ok(list.every((i) => K.ITEMS.includes(i) && !i.connect));
+  assert.equal(new Set(list.map((i) => i.id)).size, list.length);
+});
+
+test('누르면 담기는 기본값: 요금제가 있으면 첫 요금제, 없으면 금액 비움', () => {
+  assert.deepEqual(Q.defaultSelection(item('netflix')), { item: item('netflix'), planIndex: 0, amount: '' });
+  assert.deepEqual(Q.defaultSelection(item('gcp')), { item: item('gcp'), planIndex: null, amount: '' });
+});
+
+test('고른 것 월 합계: 달러는 환율로, 연 결제는 월로, 금액 없는 것은 0으로 원화에 합친다', () => {
+  const picks = [
+    { item: item('netflix'), planIndex: 1, amount: '' }, // 13,500
+    { item: item('cursor'), planIndex: 0, amount: '' }, // $20
+    { item: item('apple-dev'), planIndex: 0, amount: '' }, // $99/년
+    { item: item('gcp'), planIndex: null, amount: '' },
+  ];
+  assert.equal(Q.monthlyTotalKRW(picks, 1400), 13500 + 28000 + Math.round(99 / 12 * 1400));
+  assert.equal(Q.monthlyTotalKRW([], 1400), 0);
+});
+
+test('고른 것 합계: 직접 적은 금액도 더하고, 잘못된 금액은 무시한다', () => {
+  const picks = [{ item: item('gcp'), planIndex: null, amount: '5' }, { item: item('ncloud'), planIndex: null, amount: '-3' }];
+  assert.equal(Q.monthlyTotalKRW(picks, 1000), 5000);
+});
+
+test('주 버튼 문구: 0개면 "추가", 금액이 있으면 "N개 추가 · 월 ₩합계", 금액이 없으면 개수만', () => {
+  assert.equal(Q.submitLabel([], 1400), '추가');
+  assert.equal(Q.submitLabel([{ item: item('netflix'), planIndex: 1, amount: '' }], 1400), '1개 추가 · 월 13,500원');
+  assert.equal(Q.submitLabel([{ item: item('gcp'), planIndex: null, amount: '' }], 1400), '1개 추가');
+});

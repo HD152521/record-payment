@@ -18,6 +18,15 @@
     return node;
   }
 
+  /** 카탈로그 서비스의 로고 아바타. 아이콘은 확장 안의 SVG를 마스크로 칠하고, 없으면 이름 색 글자. 외부 요청 없음. */
+  function brandAvatar(item, extraClass = '') {
+    const a = root.PaymentCatalog.avatarFor(item);
+    const cls = `avatar brand ${a.icon ? 'has-icon' : 'is-letter'} ${extraClass}`.trim();
+    if (!a.icon) return el('span', { class: cls, style: `--brand:${a.color}`, 'aria-hidden': 'true' }, a.letter);
+    const color = a.isDark ? 'var(--ink)' : a.color;
+    return el('span', { class: cls, style: `--brand:${color};--logo:url(../${a.icon})`, 'aria-hidden': 'true' });
+  }
+
   function formatTotals(byCurrency) {
     // 0인 통화는 빼고 보여 준다("0원 + $100.00" 대신 "$100.00")
     const entries = Object.entries(byCurrency).filter(([, v]) => v);
@@ -118,7 +127,7 @@
   const FALLBACK_FX_AS_OF = '2026-11';
   const withFallbackFx = (meta) => (meta && meta.usdKrw ? meta : { ...(meta || {}), usdKrw: FALLBACK_USD_KRW, fxFallback: true });
 
-  root.PaymentUI = { el, formatTotals, amountText, kindBadge, formatDate, formatTime, cloudOverview, toast, dismissToast, radioChip, checkedValue, checkRadio,
+  root.PaymentUI = { el, brandAvatar, formatTotals, amountText, kindBadge, formatDate, formatTime, cloudOverview, toast, dismissToast, radioChip, checkedValue, checkRadio,
     FALLBACK_USD_KRW, FALLBACK_FX_AS_OF, withFallbackFx,
   };
 })(globalThis);

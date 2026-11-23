@@ -27,6 +27,8 @@
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
+  --series-4: #9b5de5;
+  --series-5: #b08a1e;
 
   --font-sans: "Pretendard Variable", Pretendard, "SUIT Variable", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", D2Coding, ui-monospace, Consolas, monospace;
@@ -69,6 +71,8 @@
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #a678e8;
+    --series-5: #b38f24;
     --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 28px -16px rgb(0 0 0 / 0.7);
     --shadow-lift: 0 24px 48px -20px rgb(0 0 0 / 0.8);
     --ring: 0 0 0 3px rgb(91 140 255 / 0.35);
@@ -162,6 +166,10 @@ body {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
 }
+
+/* 목록 계단 등장(lib/motion.js staggerIn) */
+.stagger-in { animation: stagger-in 320ms var(--ease) var(--stagger, 0ms) both; }
+@keyframes stagger-in { from { opacity: 0; transform: translateY(6px); } }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

@@ -286,9 +286,28 @@
     return cards.map((c) => (c === existing ? { ...fresh, ...keepNames, id: existing.id, createdAt: existing.createdAt } : c));
   }
 
-  /** 카드별로 사용 중인 구독 수와 월 환산 금액. 등록 안 했지만 기록에 나온 카드도 보여 준다. */
-  function cardSummary(records, cards) {
-    const used = records.filter((r) => isActiveSubscription(r) && isConfirmed(r) && r.card && r.card.last4);
+  const hasCard = (r) => Boolean(r.card && r.card.last4);
+
+  // 카드 합계에 드는 기록: 확인됐고 사용료에 안 들어간 구독(해지해도 이번 달 결제일이 있으면 포함, 홈과 같은 규칙), 이번 달 일회성
+  function cardRelevant(records, now, isCovered) {
+    const [from, to] = monthRange(now);
+    return records.filter((r) => isConfirmed(r) && !isCovered(r)
+      && (isActiveSubscription(r) || chargeDates(r, from, to).length > 0
+        || (r.kind === 'one_time' && r.startedAt >= from && r.startedAt < to)));
+  }
+
+  function monthPart(mine, now) {
+    const s = summarize(mine, now);
+    const next = mine.filter(isActiveSubscription).map((r) => nextChargeDate(r, now)).filter(Boolean).sort((a, b) => a - b)[0];
+    return { paid: s.paidThisMonth, due: s.dueThisMonth, thisMonth: s.thisMonth, records: mine, nextCharge: next ? next.getTime() : null };
+  }
+
+  /**
+   * 카드별 이번 달 나간 돈·나갈 돈(구독+일회성)과 월 환산. 등록 안 했지만 기록에 나온 카드도 보여 준다.
+   * 서버·API 사용료는 기록이 아니라서 들어가지 않는다. 사용료가 이미 센 기록(isCovered)은 뺀다.
+   */
+  function cardSummary(records, cards, now = Date.now(), { isCovered = () => false } = {}) {
+    const used = cardRelevant(records, now, isCovered).filter(hasCard);
     const seen = used
       .map((r) => r.card)
       .filter((card, i, list) => list.findIndex((c) => c.last4 === card.last4) === i)
@@ -296,8 +315,16 @@
       .map((card) => ({ label: `${card.brand || '카드'} ····${card.last4}`, brand: card.brand || '카드', last4: card.last4, registered: false }));
     return [...cards.map((c) => ({ ...c, registered: true })), ...seen].map((card) => {
       const mine = used.filter((r) => r.card.last4 === card.last4);
-      return { ...card, count: mine.length, monthly: sumByCurrency(mine, monthlyEquivalent) };
+      const subs = mine.filter(isActiveSubscription);
+      return { ...card, count: subs.length, monthly: sumByCurrency(subs, monthlyEquivalent), ...monthPart(mine, now) };
     });
+  }
+
+  /** 카드를 정하지 않은 기록의 이번 달 합계와 목록 */
+  function unassignedSummary(records, now = Date.now(), { isCovered = () => false } = {}) {
+    const mine = cardRelevant(records, now, isCovered).filter((r) => !hasCard(r));
+    const counted = mine.filter((r) => r.kind === 'one_time' || isActiveSubscription(r));
+    return { count: counted.length, ...monthPart(mine, now) };
   }
 
   function csvCell(value) {
@@ -318,7 +345,7 @@
 
   const api = {
     KIND_LABEL, CYCLE_LABEL, createRecord, mergeRecord, monthlyEquivalent,
-    nextChargeDate, summarize, formatMoney, isConfirmed, markConfirmed, toCsv, krwTotal, sanitizeRecord, normalizeCard, upsertCard, cardSummary,
+    nextChargeDate, summarize, formatMoney, isConfirmed, markConfirmed, toCsv, krwTotal, sanitizeRecord, normalizeCard, upsertCard, cardSummary, unassignedSummary,
     chargeDates, monthRange, isActiveSubscription, originOnly, daysUntil, SOON_DAYS,
   };
   root.PaymentLedger = api;

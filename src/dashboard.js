@@ -4,7 +4,7 @@
   const L = globalThis.PaymentLedger;
   const S = globalThis.PaymentStore;
   const K = globalThis.PaymentCatalog;
-  const { el, formatTotals, amountText, kindBadge, formatDate, cloudOverview, toast, radioChip, checkedValue, checkRadio, withFallbackFx, FALLBACK_FX_AS_OF } = globalThis.PaymentUI;
+  const { el, brandAvatar, formatTotals, amountText, kindBadge, formatDate, cloudOverview, toast, radioChip, checkedValue, checkRadio, withFallbackFx, FALLBACK_FX_AS_OF } = globalThis.PaymentUI;
   const Q = globalThis.PaymentQuickAdd;
   const $ = (id) => document.getElementById(id);
   const H = globalThis.PaymentHistory;
@@ -52,7 +52,7 @@
   function renderHeadline(s, usdKrw) {
     const cloudNow = cloudParts();
     const { paidKRW, dueKRW, unconverted } = globalThis.PaymentForecast.monthForecast(s, cloudNow, usdKrw);
-    $('monthly-total').textContent = joinMoney(paidKRW + dueKRW, unconverted);
+    globalThis.PaymentMotion.countUp($('monthly-total'), paidKRW + dueKRW, (n) => joinMoney(n, unconverted));
     renderDelta(paidKRW + dueKRW, usdKrw);
     renderBudget(paidKRW + dueKRW);
     renderSplit(paidKRW, dueKRW);
@@ -126,6 +126,7 @@
         el('span', { class: 'leader', 'aria-hidden': 'true' }),
         el('span', { class: 'amount' }, L.formatMoney(record.amount, record.currency)))));
     $('upcoming-empty').hidden = upcoming.length > 0;
+    globalThis.PaymentMotion.staggerIn($('upcoming-list'));
   }
 
   // 무료 체험은 감지한 날이 아니라 체험 끝나는 날이 첫 결제일이라, "맞아요"를 눌러도 날짜를 받으러 편집기를 연다.
@@ -173,6 +174,7 @@
   const siteInitial = (site) => (String(site || '?').replace(/^www\./, '').match(/[\p{L}\p{N}]/u) || ['?'])[0];
 
   function renderRow(r) {
+    const catalogItem = K.findBySite(r.site);
     const isPending = !L.isConfirmed(r);
     const covered = !isPending && isCovered(r);
     const flags = [
@@ -185,7 +187,7 @@
     return el('tr', { class: classes || null },
       el('td', { class: 'site' },
         el('div', { class: 'site-cell' },
-          el('span', { class: `avatar kind-${r.kind}`, 'aria-hidden': 'true' }, siteInitial(r.site)),
+          catalogItem ? brandAvatar(catalogItem, `kind-${r.kind}`) : el('span', { class: `avatar kind-${r.kind}`, 'aria-hidden': 'true' }, siteInitial(r.site)),
           el('span', { class: 'site-name' }, r.site, r.note && el('small', {}, r.note)))),
       el('td', { class: 'kind' }, kindBadge(r), ...flags),
       el('td', { class: 'num' }, amountText(r)),
@@ -453,6 +455,7 @@
     getRecords: () => records,
     getCloud: () => cloud,
     getSettings: () => settings,
+    getCards: () => cards,
     isCovered,
     cloudView,
     exportCsv,

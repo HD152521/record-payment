@@ -1,7 +1,7 @@
 /* 탭별로 결제 흐름을 추적해 하나의 기록으로 합친다.
    결제창 팝업(새 탭)은 원래 탭에 묶어서 "어느 사이트에서 등록했는지"를 유지한다. */
 importScripts(
-  'lib/detect.js', 'lib/ledger.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js', 'lib/onboarding.js',
+  'lib/detect.js', 'lib/account-reader.js', 'lib/ledger.js', 'lib/account-offer.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js', 'lib/onboarding.js',
   'lib/cloud/config.js', 'lib/cloud/costs.js', 'lib/cloud/sigv4.js',
   'lib/cloud/aws.js', 'lib/cloud/azure.js', 'lib/cloud/openai.js',
   'lib/cloud/cloudflare.js', 'lib/cloud/github.js', 'lib/cloud/vercel.js', 'lib/cloud/service.js',
@@ -156,6 +156,28 @@ async function handleContentMessage(msg, tab) {
   }
 }
 
+const DISMISS_KEY = 'accountDismissed';
+
+// 계정 페이지 안내: 읽은 값은 다시 검사하고, 저장은 여기서만 한다(content script는 저장소에 접근하지 않는다).
+async function handleAccountMessage(msg, tab, senderUrl) {
+  const offer = PaymentAccountOffer.sanitizeOffer(msg.offer, senderUrl || tab.url);
+  if (!offer) return { ok: false };
+  const records = await loadRecords();
+  const dismissed = (await chrome.storage.local.get(DISMISS_KEY))[DISMISS_KEY] || {};
+  const now = Date.now();
+  const decision = PaymentAccountOffer.decideOffer(offer, records, dismissed, now);
+  if (msg.type === 'account:check') return { ok: true, show: decision.show };
+  if (msg.type === 'account:dismiss') {
+    await chrome.storage.local.set({ [DISMISS_KEY]: { ...dismissed, [offer.siteId]: now } });
+    return { ok: true };
+  }
+  if (msg.type !== 'account:add') return { ok: false };
+  if (decision.reason === 'exists') return { ok: true, duplicate: true };
+  await saveRecords([PaymentAccountOffer.buildRecord(offer, now, senderUrl || tab.url), ...records]);
+  flashBadge(tab.id);
+  return { ok: true };
+}
+
 async function handleCardMessage(msg) {
   const cards = await loadCards();
   if (msg.type === 'cards:save') {
@@ -246,6 +268,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (sender.tab && msg.type === 'autofetch:token') {
     PaymentAutofetchWatch.receiveToken(msg, sender).catch(() => console.error('[결제 기록장] 자동으로 받은 토큰을 처리하지 못했어요.'));
     return undefined;
+  }
+  if (sender.tab && msg.type.startsWith('account:')) {
+    serialize(() => handleAccountMessage(msg, sender.tab, sender.url))
+      .then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
   }
   if (sender.tab) serialize(() => handleContentMessage(msg, sender.tab));
   return undefined;

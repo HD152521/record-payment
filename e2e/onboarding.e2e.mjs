@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,

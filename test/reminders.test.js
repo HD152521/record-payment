@@ -49,9 +49,9 @@ test('보낸 기록은 40일 지난 것부터 지운다', () => {
 test('설정은 범위 밖 값을 기본값으로 되돌린다', () => {
   assert.deepEqual(ST.normalizeSettings(undefined), ST.DEFAULT_SETTINGS);
   assert.deepEqual(ST.normalizeSettings({ budgetKRW: '150000', remind: { enabled: true, daysBefore: 3 } }),
-    { budgetKRW: 150000, remind: { enabled: true, daysBefore: 3 }, onboarding: { started: false, dismissed: false } });
+    { budgetKRW: 150000, remind: { enabled: true, daysBefore: 3 }, onboarding: { started: false, dismissed: false }, trendView: 'all' });
   assert.deepEqual(ST.normalizeSettings({ budgetKRW: -5, remind: { enabled: 'yes', daysBefore: 99 } }),
-    { budgetKRW: null, remind: { enabled: false, daysBefore: 1 }, onboarding: { started: false, dismissed: false } });
+    { budgetKRW: null, remind: { enabled: false, daysBefore: 1 }, onboarding: { started: false, dismissed: false }, trendView: 'all' });
 });
 
 test('예산 상태는 80% 넘으면 주의, 100% 넘으면 초과', () => {
@@ -59,4 +59,10 @@ test('예산 상태는 80% 넘으면 주의, 100% 넘으면 초과', () => {
   assert.deepEqual(ST.budgetState(50000, 100000), { ratio: 0.5, level: 'ok', left: 50000 });
   assert.equal(ST.budgetState(85000, 100000).level, 'warn');
   assert.deepEqual(ST.budgetState(120000, 100000), { ratio: 1.2, level: 'over', left: -20000 });
+});
+
+test('달마다 보기 설정은 알려진 값만 받고 아니면 전체', () => {
+  assert.equal(ST.DEFAULT_SETTINGS.trendView, 'all');
+  for (const v of ['all', 'card', 'category']) assert.equal(ST.normalizeSettings({ trendView: v }).trendView, v);
+  for (const v of ['x', 3, null, undefined, {}]) assert.equal(ST.normalizeSettings({ trendView: v }).trendView, 'all');
 });

@@ -20,6 +20,8 @@
 - **달마다 그래프**는 기록에서 결제일을 다시 계산해서 그려요. 서버·API 사용료는 연결한 뒤부터 달마다 쌓여요(`cloudHistory`, 24개월). 이번 달 막대는 남은 결제일까지 포함한 예상이라 옅게 보여요.
 - **월 예산**: 이번 달 돈이 예산의 80%를 넘으면 ⚠, 넘으면 ⛔로 보여 줘요.
 - **결제 알림**: 켜면 매일 아침 9시(또는 브라우저를 켤 때) 며칠 안에 결제되는 구독과 끝나는 무료 체험을 크롬 알림으로 알려요. 같은 결제일은 한 번만 알려요.
+- **카드 이용내역 가져오기**: 카드사 이용내역 CSV(엑셀은 CSV로 저장)를 고르면 브라우저 안에서만 읽어, 같은 가맹점이 비슷한 금액(±10%)으로 매달·매년 반복된 결제를 "확인할 기록"으로 넣어요. 신한·삼성·현대·KB 양식은 **공개된 일반 형태를 가정**해 만들었고(시험 파일은 `test/fixtures/`의 가짜 데이터), 다른 양식은 열 고르기로 받아요. 파일 원문은 저장하지 않아요.
+- **구독 계정 페이지 읽기**: Netflix·YouTube Premium·Spotify·Claude·GitHub의 결제 화면을 열면 요금제·가격·다음 결제일을 읽어 "결제 기록장에 추가할까요?" 안내를 띄워요. 추가를 눌러야 "확인할 기록"으로 저장하고, 거절하면 그 사이트는 30일 동안 다시 묻지 않아요. 못 읽는 화면에서는 조용히 넘어가요.
 - **백업·복원**: 기록·카드·설정을 `.json`으로 받아요. 사용료 연결 키는 넣지 않아요. 가져올 때 기록을 하나씩 다시 검사하고, 같은 기록은 파일 값으로 바꿔요.
 - **모든 데이터 지우기**: "지우기"를 입력해야 지워져요. 서비스에서 만든 토큰은 그쪽에서도 지워 주세요.
 
@@ -165,4 +167,16 @@ CHROMIUM_PATH=<chromium 경로> node e2e/autofetch.e2e.mjs   # 토큰 자동 받
 CHROMIUM_PATH=<chromium 경로> node e2e/wizard.e2e.mjs      # GitHub 로그인(device flow)·AWS 빠른 생성 (설정값을 채운 경우)
 CHROMIUM_PATH=<chromium 경로> node e2e/pages.e2e.mjs       # 화면 나누기·달마다 그래프·예산·알림 설정·백업/복원·검색
 CHROMIUM_PATH=<chromium 경로> node e2e/picker.e2e.mjs      # 빠른 추가(여러 개·되돌리기)·내 카드
+CHROMIUM_PATH=<chromium 경로> node e2e/cardsum.e2e.mjs     # 카드별 이번 달 합계·카드 상세·미지정 기록 한 번에 정하기
+CHROMIUM_PATH=<chromium 경로> node e2e/statement.e2e.mjs   # 카드 이용내역 가져오기(가짜 CSV, 외부 요청 0건)
+CHROMIUM_PATH=<chromium 경로> node e2e/account.e2e.mjs     # 구독 계정 페이지 읽기(가짜 응답)·거절 30일
+CHROMIUM_PATH=<chromium 경로> node e2e/store-shots.e2e.mjs # 웹스토어 스크린샷 5장 다시 찍기(e2e/store-shots/)
 ```
+
+## 서비스 로고와 상표 안내
+
+빠른 추가 목록과 기록 표의 서비스 로고는 [Simple Icons](https://simpleicons.org)(CC0 1.0, 퍼블릭 도메인) SVG를 `icons/brands/`에 담아 쓴 거예요. 로고를 인터넷에서 불러오지 않아서 외부 요청이 없어요.
+
+- 로고와 이름은 각 회사의 상표예요. 이 확장은 해당 회사와 관계가 없고 후원·보증을 받지 않았어요. 서비스를 알아보기 쉽게 하려는 용도로만 써요.
+- 로고가 없는 서비스는 이름에서 만든 색의 글자 아바타로 보여 줘요.
+- 다시 가져오려면: `npm pack simple-icons`로 받아 푼 뒤 `node scripts/fetch-brand-icons.mjs <푼 폴더>/package`. 카탈로그(`src/lib/catalog.js`)의 `BRANDS`에 있는 아이콘만 복사해요.

@@ -84,6 +84,11 @@
         <p class="muted page-sub" id="trend-sub"></p>
       </div>
       <div class="toolbar">
+        <div class="filters" id="trend-view" role="group" aria-label="나눠 보기">
+          <button type="button" data-view="all" aria-pressed="true">전체</button>
+          <button type="button" data-view="card" aria-pressed="false">카드별</button>
+          <button type="button" data-view="category" aria-pressed="false">분류별</button>
+        </div>
         <div class="filters" id="trend-range" role="group" aria-label="기간">
           <button type="button" data-months="6" aria-pressed="false">6개월</button>
           <button type="button" data-months="12" aria-pressed="true">12개월</button>
@@ -169,6 +174,10 @@
         </div>
         <button type="button" class="btn" id="card-add">카드 등록</button>
       </div>
+      <div class="card-unassigned" id="card-unassigned" hidden>
+        <span id="card-unassigned-text"></span>
+        <button type="button" class="btn small" id="card-unassigned-btn">카드 정하기</button>
+      </div>
       <ul class="card-list" id="card-list"></ul>
       <p class="muted" id="card-empty" hidden>카드를 등록해 두면 기록을 추가할 때 고르기만 하면 돼요. 끝 4자리만 저장해요.</p>
     </section>
@@ -217,6 +226,18 @@
       </div>
     </section>
     <p class="status" id="settings-status" role="status"></p>
+
+    <section class="setting" aria-labelledby="stmt-h">
+      <div>
+        <h2 id="stmt-h">카드 이용내역 가져오기</h2>
+        <p class="muted">카드사에서 받은 이용내역 CSV를 고르면, 매달·매년 반복되는 결제를 구독 후보로 찾아 "확인할 기록"에 넣어요. 엑셀(xlsx)은 CSV로 저장해서 올려 주세요. 파일은 이 브라우저 안에서만 읽고 저장하지 않아요. 후보만 남아요.</p>
+      </div>
+      <div class="setting-ctl">
+        <label class="btn ghost small file-btn">이용내역 파일 고르기<input type="file" id="stmt-file" accept=".csv,.tsv,.txt,text/csv" class="sr-only"></label>
+      </div>
+    </section>
+    <section class="setting stmt-panel" id="stmt-panel" aria-live="polite" hidden></section>
+    <p class="status" id="stmt-status" role="status"></p>
 
     <section class="setting data-zone" aria-labelledby="data-h">
       <div>
@@ -285,19 +306,24 @@
 
   <dialog id="picker" class="sheet wide" aria-labelledby="picker-title">
     <form id="picker-form" method="dialog">
-      <div class="sheet-head">
+      <div class="sheet-head picker-head">
         <div>
           <h2 id="picker-title">무엇을 추가할까요?</h2>
-          <p class="muted sheet-sub">여러 개를 한 번에 골라도 돼요. 요금제·카드·결제일은 누르기만 하면 돼요.</p>
+          <p class="muted sheet-sub">누르면 바로 담겨요. 여러 개를 골라도 돼요.</p>
         </div>
+        <span class="spacer"></span>
+        <button type="button" class="icon-btn" id="picker-cancel" aria-label="닫기">✕</button>
       </div>
-      <label class="search-field"><span class="sr-only">검색</span><input name="q" type="search" placeholder="넷플릭스, AWS, Cursor…" autocomplete="off"></label>
-      <div class="chips" id="picker-cats" role="group" aria-label="분류"></div>
+      <div class="picker-top">
+        <label class="search-field"><span class="sr-only">검색</span><input name="q" type="search" placeholder="넷플릭스, AWS, Cursor…" autocomplete="off"></label>
+        <div class="segmented picker-cats" id="picker-cats" role="group" aria-label="분류"></div>
+      </div>
+      <h3 class="picker-heading" id="picker-heading"></h3>
       <ul class="picker-list" id="picker-list"></ul>
-      <p class="muted" id="picker-empty" hidden>목록에 없어요. 아래 "직접 입력"으로 추가해 주세요.</p>
+      <p class="muted picker-empty" id="picker-empty" hidden>목록에 없어요. <button type="button" class="link" id="picker-custom"></button></p>
       <section class="tray" id="picker-tray" aria-labelledby="tray-h" hidden>
-        <h3 id="tray-h">고른 곳 <span class="count" id="tray-count"></span></h3>
-        <ul class="tray-list" id="tray-list"></ul>
+        <h3 id="tray-h">고른 것 <span class="count" id="tray-count"></span></h3>
+        <p class="muted tray-names" id="tray-names"></p>
         <fieldset class="field"><legend>결제 카드</legend><div class="chips choice" id="tray-cards"></div></fieldset>
         <fieldset class="field"><legend>첫 결제일</legend>
           <div class="date-row"><div class="chips choice" id="tray-dates"></div><input type="date" name="trayDate" aria-label="첫 결제일 직접 고르기"></div>
@@ -307,10 +333,21 @@
       <div class="actions sheet-foot">
         <button type="button" class="btn ghost" id="picker-manual">직접 입력</button>
         <span class="spacer"></span>
-        <button type="button" class="btn ghost" id="picker-cancel">닫기</button>
         <button type="submit" class="btn" id="picker-submit" disabled>추가</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="card-detail" class="sheet" aria-labelledby="card-detail-title">
+    <div class="sheet-head"><h2 id="card-detail-title">카드</h2><button type="button" class="link" id="card-detail-close" aria-label="닫기">✕</button></div>
+    <p class="card-detail-total" id="card-detail-total"></p>
+    <p class="muted" id="card-detail-sub"></p>
+    <div class="card-assign" id="card-assign" hidden>
+      <label>이 카드로 정하기 <select id="card-assign-pick"></select></label>
+      <button type="button" class="btn small" id="card-assign-btn">정하기</button>
+    </div>
+    <ul class="card-detail-list" id="card-detail-list"></ul>
+    <p class="muted" id="card-detail-empty" hidden>이번 달 기록이 없어요.</p>
   </dialog>
 
   <dialog id="card-dialog" class="sheet" aria-labelledby="card-dialog-title">
@@ -438,8 +475,10 @@
   <script src="lib/forecast.js"></script>
   <script src="lib/settings.js"></script>
   <script src="lib/backup.js"></script>
+  <script src="lib/statement.js"></script>
   <script src="lib/quickadd.js"></script>
   <script src="lib/onboarding.js"></script>
+  <script src="lib/motion.js"></script>
   <script src="ui.js"></script>
   <script src="lib/cloud/config.js"></script>
   <script src="lib/cloud/costs.js"></script>
@@ -459,5 +498,6 @@
   <script src="router.js"></script>
   <script src="trends.js"></script>
   <script src="settings-page.js"></script>
+  <script src="statement-page.js"></script>
 </body>
 </html>

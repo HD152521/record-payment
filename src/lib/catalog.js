@@ -22,7 +22,7 @@
   const usd = (name, amount, cycle = 'monthly') => ({ name, amount, currency: 'USD', cycle });
   const krw = (name, amount, cycle = 'monthly') => ({ name, amount, currency: 'KRW', cycle });
 
-  const ITEMS = [
+  const BASE_ITEMS = [
     // 서버·클라우드
     { id: 'aws', name: 'AWS', site: 'aws.amazon.com', category: 'cloud', connect: 'aws', aliases: ['아마존', 'amazon web services'] },
     { id: 'azure', name: 'Azure', site: 'azure.microsoft.com', category: 'cloud', connect: 'azure', aliases: ['애저', 'microsoft azure'] },
@@ -86,7 +86,41 @@
       plans: [krw('월간', 4900)] },
   ];
 
+  // Simple Icons(CC0)에 있는 서비스: id -> [아이콘 이름, 공식 색]. 없는 서비스는 이름에서 만든 색의 글자 아바타를 쓴다.
+  const BRANDS = {
+    gcp: ['googlecloud', '4285F4'], cloudflare: ['cloudflare', 'F38020'], vercel: ['vercel', '000000'],
+    supabase: ['supabase', '3FCF8E'], netlify: ['netlify', '00C7B7'], railway: ['railway', '0B0D0E'],
+    ncloud: ['naver', '03C75A'], claude: ['claude', 'D97757'], 'anthropic-api': ['anthropic', '191919'],
+    gemini: ['googlegemini', '8E75B2'], cursor: ['cursor', '000000'], perplexity: ['perplexity', '1FB8CD'],
+    github: ['github', '181717'], jetbrains: ['jetbrains', '000000'], docker: ['docker', '2496ED'],
+    sentry: ['sentry', '362D59'], 'apple-dev': ['apple', '000000'], notion: ['notion', '000000'],
+    figma: ['figma', 'F24E1E'], netflix: ['netflix', 'E50914'], youtube: ['youtube', 'FF0000'],
+    spotify: ['spotify', '1ED760'], icloud: ['icloud', '3693F3'], 'naver-plus': ['naver', '03C75A'],
+  };
+  const ITEMS = BASE_ITEMS.map((item) => {
+    const brand = BRANDS[item.id];
+    return brand ? { ...item, icon: brand[0], color: brand[1] } : item;
+  });
+
   const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
+
+  const DARK_LUMA = 60;
+  const hashOf = (s) => [...String(s)].reduce((h, c) => (Math.imul(h, 31) + c.codePointAt(0)) >>> 0, 7);
+  const isDarkHex = (hex) => {
+    const n = parseInt(hex, 16);
+    return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) < DARK_LUMA;
+  };
+
+  /** 화면에 그릴 아바타. 아이콘이 있으면 공식 색, 없으면 이름에서 만든 색의 첫 글자. */
+  function avatarFor(item) {
+    const name = String((item && item.name) || '');
+    const letter = (name.match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase();
+    if (item && item.icon && item.color) {
+      return { icon: `icons/brands/${item.icon}.svg`, color: `#${item.color.toLowerCase()}`, isDark: isDarkHex(item.color), letter };
+    }
+    const hue = hashOf((item && (item.id || item.name)) || '') % 360;
+    return { icon: null, color: `hsl(${hue} 55% 40%)`, isDark: false, letter };
+  }
 
   /** Azure는 배포자가 앱 ID를 채워야 쓸 수 있다. 비어 있으면 선택지에서 뺀다. config를 안 넘기면 전부 쓸 수 있다고 본다. */
   function isConnectable(provider, config) {
@@ -139,7 +173,7 @@
     };
   }
 
-  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, isConnectable, connectableProviders, VERIFIED_PROVIDERS, FEEDBACK_URL, isBeta, findBySite, recordFields, coveredBy };
+  const api = { PRICES_AS_OF, CONNECTORS, CATEGORIES, ITEMS, search, isConnectable, connectableProviders, VERIFIED_PROVIDERS, FEEDBACK_URL, isBeta, findBySite, recordFields, coveredBy, avatarFor };
   root.PaymentCatalog = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

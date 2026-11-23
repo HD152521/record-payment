@@ -10,8 +10,13 @@ const pkg = JSON.parse(read('package.json'));
 const listing = read('docs/store-listing.md');
 const privacy = read('docs/privacy.html');
 
+const lockfile = JSON.parse(read('package-lock.json'));
+const { SITES: ACCOUNT_SITES } = require('../src/lib/account-reader.js');
+
 const PRIVACY_URL = 'https://hd152521.github.io/record-payment/privacy.html';
 const MAX_SHORT = 132;
+const VERSION = '0.5.0';
+const PINNED_PERMISSIONS = ['storage', 'webNavigation', 'alarms', 'scripting', 'notifications'];
 
 function section(title) {
   const start = listing.indexOf('## ' + title);
@@ -21,9 +26,16 @@ function section(title) {
   return end < 0 ? rest : rest.slice(0, end);
 }
 
-test('manifest와 package.json 버전이 0.4.0으로 같다', () => {
-  assert.equal(manifest.version, '0.4.0');
-  assert.equal(pkg.version, manifest.version);
+test(`manifest·package.json·package-lock.json 버전이 ${VERSION}으로 같다`, () => {
+  assert.equal(manifest.version, VERSION);
+  assert.equal(pkg.version, VERSION);
+  assert.equal(lockfile.version, VERSION);
+  assert.equal(lockfile.packages[''].version, VERSION);
+});
+
+test('권한 목록은 v0.4.0과 같다(v0.5.0에서 권한을 더하지 않았다)', () => {
+  assert.deepEqual(manifest.permissions, PINNED_PERMISSIONS);
+  assert.deepEqual(manifest.host_permissions, ['<all_urls>']);
 });
 
 test('manifest 설명은 132자 이하다', () => {
@@ -85,6 +97,34 @@ test('데이터 사용 공개가 privacy.html의 저장 항목과 어긋나지 �
   assert.ok(privacy.includes('전체 카드번호'));
   assert.ok(/전체 카드번호[^\n]*저장하지 않/.test(body) || body.includes('끝 4자리'));
   assert.ok(!/개발자 서버로 (전송|보내)해요/.test(body));
+});
+
+test('자세한 설명이 카드 이용내역 가져오기와 계정 페이지 읽기를 설명한다', () => {
+  const body = section('자세한 설명');
+  assert.ok(body.includes('이용내역'), '이용내역 가져오기');
+  assert.ok(body.includes('구독 계정 페이지'), '계정 페이지 읽기');
+});
+
+test('권한 사유(<all_urls>)가 계정 페이지 읽기를 설명한다', () => {
+  const row = section('권한별 사유').split('\n').find((l) => l.includes('`<all_urls>`'));
+  assert.ok(row && row.includes('요금제'), row);
+});
+
+test('데이터 사용 공개가 이용내역 원문을 저장·전송하지 않는다고 밝힌다', () => {
+  const body = section('데이터 사용 공개');
+  assert.ok(body.includes('이용내역') && body.includes('원문'));
+});
+
+test('개인정보 처리방침이 이용내역 가져오기를 브라우저 안에서만 처리한다고 밝힌다', () => {
+  assert.ok(privacy.includes('이용내역'));
+  assert.ok(privacy.includes('원문'));
+  assert.ok(privacy.includes('구독 계정 페이지'));
+});
+
+test('개인정보 처리방침이 계정 페이지 읽기 대상 사이트를 모두 적는다', () => {
+  for (const site of ACCOUNT_SITES) {
+    assert.ok(privacy.includes(site.name), `처리방침에 없음: ${site.name}`);
+  }
 });
 
 test('Azure 앱 ID가 비어 있으면 Azure 문구와 Azure 전용 권한이 없다', () => {

@@ -14,6 +14,7 @@ const GH_TOKEN = `github_pat_${'g'.repeat(40)}`;
 const VC_TOKEN = 'vc'.padEnd(24, 'y');
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,

@@ -8,12 +8,13 @@
   const K = globalThis.PaymentCatalog;
   const Q = globalThis.PaymentQuickAdd;
   const CONFIG = globalThis.PaymentCloudConfig;
-  const { el, toast, radioChip, checkedValue, checkRadio } = globalThis.PaymentUI;
+  const { el, brandAvatar, toast, radioChip, checkedValue, checkRadio } = globalThis.PaymentUI;
   const $ = (id) => document.getElementById(id);
   const ALL = 'all';
   const CUSTOM_DATE = 'custom';
+  const POPULAR = 'popular';
 
-  let category = ALL;
+  let category = POPULAR;
   let picked = []; // [{ item, planIndex, amount }]
   let cards = [];
 
@@ -21,40 +22,56 @@
   const dash = () => globalThis.PaymentDashboard;
   const isPicked = (item) => picked.some((p) => p.item.id === item.id);
   const hasRecord = (item) => dash().getRecords().some((r) => r.status === 'active' && K.findBySite(r.site) === item);
-  const initial = (name) => (String(name).match(/[\p{L}\p{N}]/u) || ['?'])[0];
 
   function itemHint(item) {
     if (item.connect) return '사용료 자동 연결';
     if (item.plans && item.plans.length) {
       const p = item.plans[0];
-      return `${L.formatMoney(p.amount, p.currency)}~/${L.CYCLE_LABEL[p.cycle]}`;
+      return `${L.formatMoney(p.amount, p.currency)}/${L.CYCLE_LABEL[p.cycle]}`;
     }
     return '금액 직접 입력';
   }
 
+  const query = () => form().elements.q.value.trim();
+
+  // 검색 중에는 전체에서 찾고, 아니면 고른 분류(처음엔 "많이 쓰는 것")만 보여 준다
+  function visibleItems() {
+    if (query()) return K.search(query(), null, CONFIG);
+    if (category === POPULAR) return Q.popularItems();
+    return K.search('', category === ALL ? null : category, CONFIG);
+  }
+
   // ── 목록 ────────────────────────────────────────────────
-  function itemButton(item) {
+  function itemRow(item) {
     const on = isPicked(item);
-    return el('li', {},
+    const entry = picked.find((p) => p.item.id === item.id);
+    return el('li', { class: 'picker-row' },
       el('button', {
         type: 'button', class: `picker-item${item.connect ? ' is-connect' : ''}`,
         'aria-pressed': item.connect ? null : String(on), onclick: () => toggle(item),
       },
-      el('span', { class: 'avatar', 'aria-hidden': 'true' }, initial(item.name)),
-      el('span', { class: 'picker-text' },
-        el('span', { class: 'picker-name' }, item.name),
-        el('span', { class: 'picker-hint' }, itemHint(item))),
+      brandAvatar(item),
+      el('span', { class: 'picker-name' }, item.name),
       hasRecord(item) && el('span', { class: 'badge' }, '기록 있음'),
-      !item.connect && el('span', { class: 'picker-check', 'aria-hidden': 'true' }, on ? '✓' : '+')));
+      el('span', { class: 'picker-hint' }, itemHint(item)),
+      !item.connect && el('span', { class: 'picker-check', 'aria-hidden': 'true' }, on ? '✓' : '+')),
+      entry && el('div', { class: 'picker-detail' }, planControl(entry)));
   }
 
   function renderList() {
-    const chips = [{ id: ALL, label: '전체' }, ...K.CATEGORIES].map((c) =>
+    const searching = query() !== '';
+    const chips = [{ id: POPULAR, label: '많이 쓰는 것' }, { id: ALL, label: '전체' }, ...K.CATEGORIES].map((c) =>
       el('button', { type: 'button', 'aria-pressed': String(c.id === category), onclick: () => { category = c.id; renderList(); } }, c.label));
     $('picker-cats').replaceChildren(...chips);
-    const items = K.search(form().elements.q.value, category === ALL ? null : category, CONFIG);
-    $('picker-list').replaceChildren(...items.map(itemButton));
+    $('picker-cats').hidden = searching;
+    const items = visibleItems();
+    $('picker-heading').textContent = searching ? '검색 결과' : (category === POPULAR ? 'IT인이 많이 쓰는 것' : '');
+    $('picker-heading').hidden = !$('picker-heading').textContent;
+    $('picker-list').replaceChildren(...items.map(itemRow));
+    picked.filter((p) => p.planIndex != null).forEach((p) => checkRadio(form(), `plan-${p.item.id}`, String(p.planIndex)));
     $('picker-empty').hidden = items.length > 0;
+    $('picker-custom').textContent = `'${query()}' 직접 추가`;
+    $('picker-custom').hidden = !searching;
   }
 
   function toggle(item) {
@@ -63,49 +80,43 @@
       globalThis.PaymentCloudUI.openDialog(item.connect);
       return;
     }
-    picked = isPicked(item)
-      ? picked.filter((p) => p.item.id !== item.id)
-      : [...picked, { item, planIndex: item.plans && item.plans.length ? 0 : null, amount: '' }];
+    picked = isPicked(item) ? picked.filter((p) => p.item.id !== item.id) : [...picked, Q.defaultSelection(item)];
     renderList();
     renderTray();
   }
 
-  // ── 담은 곳 ─────────────────────────────────────────────
+  // ── 담은 줄: 그 자리에서 펼쳐 요금제(또는 금액)를 바꾼다 ──────────────
   const update = (id, patch) => { picked = picked.map((p) => (p.item.id === id ? { ...p, ...patch } : p)); };
 
-  function trayPlan(p) {
+  function planControl(p) {
     const plans = p.item.plans || [];
     if (!plans.length) {
       const unit = p.item.currency === 'KRW' ? '원' : '달러';
       return el('label', { class: 'tray-amount' },
         el('span', { class: 'sr-only' }, `${p.item.name} 금액`),
-        el('input', { type: 'number', min: '0', step: 'any', inputmode: 'decimal', placeholder: '금액(선택)', value: p.amount,
-          oninput: (e) => update(p.item.id, { amount: e.target.value }) }),
+        el('input', { type: 'number', min: '0', step: 'any', inputmode: 'decimal', placeholder: '월 금액(선택)', value: p.amount,
+          oninput: (e) => { update(p.item.id, { amount: e.target.value }); renderSubmit(); } }),
         el('span', { class: 'unit' }, unit));
     }
     const name = `plan-${p.item.id}`;
     const group = el('div', { class: 'chips choice small', role: 'radiogroup', 'aria-label': `${p.item.name} 요금제` },
       ...plans.map((plan, i) => radioChip(name, String(i), `${plan.name} ${L.formatMoney(plan.amount, plan.currency)}`)));
-    group.addEventListener('change', (e) => update(p.item.id, { planIndex: Number(e.target.value) }));
+    group.addEventListener('change', (e) => { update(p.item.id, { planIndex: Number(e.target.value) }); renderSubmit(); });
     return group;
   }
 
-  function trayRow(p) {
-    return el('li', {},
-      el('span', { class: 'avatar', 'aria-hidden': 'true' }, initial(p.item.name)),
-      el('div', { class: 'tray-main' }, el('span', { class: 'tray-name' }, p.item.name), trayPlan(p)),
-      el('button', { type: 'button', class: 'icon-btn', 'aria-label': `${p.item.name} 빼기`, onclick: () => toggle(p.item) }, '✕'));
+  function renderSubmit() {
+    const submit = $('picker-submit');
+    submit.disabled = picked.length === 0;
+    submit.textContent = Q.submitLabel(picked, dash().getCloud().meta.usdKrw);
   }
 
   function renderTray() {
     $('picker-tray').hidden = picked.length === 0;
-    $('tray-count').textContent = String(picked.length);
-    $('tray-list').replaceChildren(...picked.map(trayRow));
-    picked.filter((p) => p.planIndex != null).forEach((p) => checkRadio(form(), `plan-${p.item.id}`, String(p.planIndex)));
+    $('tray-count').textContent = `${picked.length}개`;
+    $('tray-names').textContent = picked.map((p) => p.item.name).join(', ');
     $('picker-manual').textContent = picked.length === 1 ? '자세히 입력' : '직접 입력';
-    const submit = $('picker-submit');
-    submit.disabled = picked.length === 0;
-    submit.textContent = picked.length ? `${picked.length}개 추가` : '추가';
+    renderSubmit();
   }
 
   function renderCardChips() {
@@ -144,7 +155,7 @@
 
   // ── 열기·저장 ───────────────────────────────────────────
   async function openPicker() {
-    category = ALL;
+    category = POPULAR;
     picked = [];
     form().reset();
     cards = await S.loadCards();
@@ -181,7 +192,7 @@
   form().elements.q.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    const [first] = K.search(e.target.value, category === ALL ? null : category, CONFIG);
+    const [first] = visibleItems();
     if (e.target.value.trim() && first) { toggle(first); e.target.value = ''; renderList(); }
   });
   $('tray-dates').addEventListener('change', (e) => {
@@ -200,6 +211,11 @@
     } else {
       dash().openEditor(null);
     }
+  });
+  $('picker-custom').addEventListener('click', () => {
+    const name = query();
+    $('picker').close();
+    dash().openEditor(null, { title: name, fields: { site: name, kind: 'subscription' } });
   });
   $('picker-cancel').addEventListener('click', () => $('picker').close());
 })();

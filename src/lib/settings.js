@@ -6,10 +6,12 @@
   const MAX_BUDGET = 10_000_000_000;
   const MAX_DAYS_BEFORE = 7;
   const WARN_RATIO = 0.8;
+  const TREND_VIEWS = Object.freeze(['all', 'card', 'category']);
   const DEFAULT_SETTINGS = Object.freeze({
     budgetKRW: null,
     remind: Object.freeze({ enabled: false, daysBefore: 1 }),
     onboarding: Object.freeze({ started: false, dismissed: false }),
+    trendView: 'all',
   });
 
   function normalizeSettings(input) {
@@ -25,6 +27,7 @@
         daysBefore: Number.isInteger(days) && days >= 0 && days <= MAX_DAYS_BEFORE ? days : DEFAULT_SETTINGS.remind.daysBefore,
       },
       onboarding: { started: onboarding.started === true, dismissed: onboarding.dismissed === true },
+      trendView: TREND_VIEWS.includes(s.trendView) ? s.trendView : DEFAULT_SETTINGS.trendView,
     };
   }
 
@@ -43,7 +46,7 @@
 
   const saveSettings = (settings) => chrome.storage.local.set({ [KEY]: normalizeSettings(settings) });
 
-  const api = { KEY, DEFAULT_SETTINGS, MAX_DAYS_BEFORE, normalizeSettings, budgetState, loadSettings, saveSettings };
+  const api = { KEY, DEFAULT_SETTINGS, MAX_DAYS_BEFORE, TREND_VIEWS, normalizeSettings, budgetState, loadSettings, saveSettings };
   root.PaymentSettings = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

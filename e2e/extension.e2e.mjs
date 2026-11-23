@@ -26,6 +26,7 @@ const html = (body) => `<!doctype html><html lang="ko"><meta charset="utf-8"><bo
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,
@@ -132,6 +133,13 @@ try {
   await pop.goto(`chrome-extension://${extId}/src/popup.html`);
   await pop.waitForSelector('#upcoming li');
   await pop.screenshot({ path: path.join(SHOT_DIR, 'popup.png') });
+
+  // 움직임을 켠 사람: 팝업 금액도 같은 끝값에서 멈추고, 목록은 차례로 나타난다
+  const finalTotal = await pop.textContent('#total');
+  await pop.emulateMedia({ reducedMotion: 'no-preference' });
+  await pop.reload();
+  await pop.waitForSelector('#upcoming li.stagger-in');
+  await pop.waitForFunction((t) => document.querySelector('#total').textContent === t, finalTotal);
 
   console.log('E2E 통과');
 } finally {
