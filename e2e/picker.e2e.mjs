@@ -8,6 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOT_DIR = path.join(ROOT, 'e2e', 'screenshots');
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,
@@ -55,6 +56,28 @@ try {
   await worker.evaluate(() => chrome.storage.local.set({ records: [] }));
   await dash.waitForFunction(() => document.querySelectorAll('#rows tr').length === 0);
 
+  // 1-b) 로고: 아이콘 있는 서비스는 마스크 로고, 없는 서비스는 색 글자. 확장 밖으로 나가는 이미지 요청은 없다
+  const outside = [];
+  dash.on('request', (req) => { if (!/^(chrome-extension|data|blob):/.test(req.url()) && req.resourceType() === 'image') outside.push(req.url()); });
+  await dash.click('#add-btn');
+  await dash.waitForSelector('.picker-item');
+  const logos = await dash.evaluate(() => [...document.querySelectorAll('.picker-item .avatar')].map((a) => a.className));
+  assert.ok(logos.some((c) => c.includes('has-icon')) && logos.some((c) => c.includes('is-letter')), 'logos and letter avatars both render');
+  const maskOk = await dash.evaluate(() => getComputedStyle(document.querySelector('.picker-item .avatar.has-icon'), '::before').maskImage.includes('icons/brands/'));
+  assert.ok(maskOk, 'logo mask points at a packaged svg');
+  assert.deepEqual(outside, []);
+  // 처음엔 "IT인이 많이 쓰는 것" 8~10개만, 분류 세그먼트가 보인다. 검색하면 분류가 숨고, 결과가 없으면 "직접 추가" 줄이 나온다
+  const firstRows = await dash.locator('#picker-list li').count();
+  assert.ok(firstRows >= 8 && firstRows <= 10, `popular rows ${firstRows}`);
+  assert.equal(await dash.isVisible('#picker-cats'), true);
+  await dash.fill('#picker-form [name=q]', '없는서비스zz');
+  assert.equal(await dash.isVisible('#picker-cats'), false);
+  assert.equal(await dash.locator('#picker-list li').count(), 0);
+  assert.equal((await dash.textContent('#picker-custom')).trim(), "'없는서비스zz' 직접 추가");
+  await dash.fill('#picker-form [name=q]', '');
+  assert.equal(await dash.isVisible('#picker-cats'), true);
+  await dash.click('#picker-cancel');
+
   // 2) 하나만 담고 "되돌리기": 추가한 기록이 다시 사라진다
   await dash.click('#add-btn');
   await dash.fill('#picker-form [name=q]', '미드저니');
@@ -82,12 +105,14 @@ try {
   await dash.fill('#picker-form [name=q]', '넷플');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'picker-search.png') });
   await dash.click('.picker-item:has-text("Netflix")');
+  assert.equal(await dash.textContent('#picker-submit'), '1개 추가 · 월 5,500원');
+  await dash.click('#picker-list li:has-text("Netflix") label:has(input[name=plan-netflix][value="1"])');
   await dash.fill('#picker-form [name=q]', '');
   await dash.click('#picker-cats button:has-text("AI")');
   await dash.click('.picker-item:has-text("Cursor")');
-  assert.equal(await dash.textContent('#picker-submit'), '2개 추가');
+  assert.match(await dash.textContent('#picker-tray h3'), /고른 것 2개/);
+  assert.equal(await dash.textContent('#picker-submit'), '2개 추가 · 월 41,500원');
   assert.equal(await checked('#picker-form', 'trayCard'), '4242', '카드가 하나면 미리 고른다');
-  await dash.click('#tray-list label:has(input[name=plan-netflix][value="1"])');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'picker-tray.png') });
   await dash.click('#picker-submit');
   await dash.waitForFunction(() => document.querySelectorAll('#rows tr').length === 2);
@@ -97,10 +122,16 @@ try {
   assert.deepEqual([netflix.amount, netflix.cycle, netflix.note, netflix.review], [13500, 'monthly', '스탠다드', 'confirmed']);
   assert.deepEqual(netflix.card, { brand: 'Visa', last4: '4242' });
   assert.deepEqual([cursor.amount, cursor.currency], [20, 'USD']);
-  await dash.waitForFunction(() => document.querySelector('#card-list').textContent.includes('13,500원/월'));
+  await dash.waitForFunction(() => document.querySelector('#card-list').textContent.includes('이번 달 41,500원'));
 
   // 4) 하나만 담고 "자세히 입력": 요금제가 채워진 양식, 요금제 칩을 바꾸면 금액·메모가 따라 바뀐다
   await dash.click('#add-btn');
+  await dash.waitForTimeout(450);
+  await dash.screenshot({ path: path.join(SHOT_DIR, 'picker-desktop.png') });
+  await dash.click('#picker-cats button:has-text("전체")');
+  const clipped1280 = await dash.evaluate(() => [...document.querySelectorAll('#picker-list .picker-name')]
+    .filter((n) => n.scrollWidth > n.clientWidth).map((n) => n.textContent));
+  assert.deepEqual(clipped1280, []);
   await dash.fill('#picker-form [name=q]', '넷플');
   await dash.click('.picker-item:has-text("Netflix")');
   await dash.click('#picker-manual');
@@ -132,6 +163,36 @@ try {
   assert.doesNotMatch(await dash.textContent('#yearly-total'), /\+/);
   assert.equal(await dash.isVisible('#last4-row'), false);
 
+  // 5-b) Enter는 이미 담은 것을 빼지 않는다 + 줄마다 카드·결제일을 따로 정한다(안 정한 줄은 아래 공통 값)
+  const before = await stored('records');
+  await dash.click('#add-btn');
+  const q = '#picker-form [name=q]';
+  await dash.fill(q, '노션');
+  await dash.press(q, 'Enter');
+  await dash.fill(q, '노션');
+  await dash.press(q, 'Enter');
+  assert.match(await dash.textContent('#picker-tray h3'), /고른 것 1개/, '두 번째 Enter에서 빠지지 않는다');
+  await dash.fill(q, '피그마');
+  await dash.press(q, 'Enter');
+  assert.match(await dash.textContent('#picker-tray h3'), /고른 것 2개/);
+  await dash.fill(q, '노션');
+  await dash.selectOption('select[aria-label="Notion 결제 카드"]', '1111');
+  await dash.fill('input[aria-label="Notion 첫 결제일"]', '2026-11-20');
+  await dash.dispatchEvent('input[aria-label="Notion 첫 결제일"]', 'change');
+  await dash.fill(q, '');
+  await dash.click('#tray-cards label:has(input[value="4242"])');
+  await dash.click('#picker-submit');
+  await dash.waitForFunction((n) => document.querySelectorAll('#rows tr').length === n, before.length + 2);
+  const rows = await stored('records');
+  const notion = rows.find((r) => r.site === 'notion.so');
+  const figma = rows.find((r) => r.site === 'figma.com');
+  assert.equal(notion.card.last4, '1111');
+  assert.equal(notion.startedAt, new Date(2026, 10, 20).getTime());
+  assert.equal(figma.card.last4, '4242', '따로 안 정한 줄은 공통 카드');
+  assert.notEqual(figma.startedAt, notion.startedAt);
+  await worker.evaluate((r) => chrome.storage.local.set({ records: r }), before);
+  await dash.waitForFunction((n) => document.querySelectorAll('#rows tr').length === n, before.length);
+
   // 6) AWS는 담지 않고 연결 화면으로
   await dash.click('#add-btn');
   await dash.fill('#picker-form [name=q]', 'aws');
@@ -145,7 +206,21 @@ try {
   await dash.setViewportSize({ width: 375, height: 800 });
   await dash.screenshot({ path: path.join(SHOT_DIR, 'dashboard-mobile.png'), fullPage: true });
   await dash.click('#add-btn');
+  await dash.click('#picker-cats button:has-text("전체")');
+  await dash.click('.picker-item:has-text("Netflix")');
+  await dash.waitForTimeout(450);
   await dash.screenshot({ path: path.join(SHOT_DIR, 'picker-mobile.png') });
+  // 이름이 잘리지 않는다: 어떤 이름도 칸 밖으로 넘치지 않고 말줄임도 없다
+  const clipped = await dash.evaluate(() => [...document.querySelectorAll('#picker-list .picker-name')]
+    .filter((n) => n.scrollWidth > n.clientWidth || getComputedStyle(n).textOverflow === 'ellipsis').map((n) => n.textContent));
+  assert.deepEqual(clipped, []);
+  // 분류 줄은 폰 너비에서 숨은 가로 스크롤 없이 접혀서 모든 분류가 보인다
+  const catsOverflow = await dash.evaluate(() => {
+    const cats = document.querySelector('#picker-cats');
+    const box = cats.getBoundingClientRect();
+    return { scroll: cats.scrollWidth > cats.clientWidth, outside: [...cats.children].filter((b) => b.getBoundingClientRect().right > box.right + 1).length };
+  });
+  assert.deepEqual(catsOverflow, { scroll: false, outside: 0 });
   await dash.click('#picker-cancel');
   await dash.setViewportSize({ width: 1280, height: 900 });
 

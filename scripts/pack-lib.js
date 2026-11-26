@@ -167,8 +167,17 @@ function readZip(zip) {
   return out;
 }
 
+// manifest의 key는 압축해제 설치에서 기기마다 확장 ID를 같게 하려고 둔다. 스토어는 key가 든 업로드를 받지 않는다.
+function packData(root, name) {
+  const data = fs.readFileSync(path.join(root, name));
+  if (name !== 'manifest.json') return data;
+  const { key, ...manifest } = JSON.parse(data.toString('utf8'));
+  return Buffer.from(`${JSON.stringify(manifest, null, 2)}
+`);
+}
+
 function buildPackage(root) {
-  const entries = listPackFiles(root).map((name) => ({ name, data: fs.readFileSync(path.join(root, name)) }));
+  const entries = listPackFiles(root).map((name) => ({ name, data: packData(root, name) }));
   return buildZip(entries);
 }
 

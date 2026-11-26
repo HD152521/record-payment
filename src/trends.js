@@ -1,20 +1,23 @@
-/* 달마다 화면: 달별로 쌓은 막대 그래프 하나가 주인공. 구독·일회성·서버·API 세 가지를 같은 색 순서로 쌓는다.
+/* 달마다 화면: 달별로 쌓은 막대 그래프 하나가 주인공. 전체(구독·일회성·서버·API)·카드별·분류별로 나눠 같은 색 순서로 쌓는다.
    라이브러리 없이 SVG로 그린다(확장은 밖의 스크립트를 못 불러온다). 표로 보기·키보드 포커스로도 같은 숫자를 읽을 수 있다. */
 (() => {
   'use strict';
 
   const L = globalThis.PaymentLedger;
   const H = globalThis.PaymentHistory;
-  const { el } = globalThis.PaymentUI;
+  const { el, recordAvatar, serviceName } = globalThis.PaymentUI;
   const D = () => globalThis.PaymentDashboard;
   const $ = (id) => document.getElementById(id);
   const NS = 'http://www.w3.org/2000/svg';
 
-  const SERIES = [
-    { key: 'subscription', label: '구독', color: 'var(--series-1)' },
-    { key: 'one_time', label: '일회성', color: 'var(--series-2)' },
-    { key: 'cloud', label: '서버·API', color: 'var(--series-3)' },
-  ];
+  const ST = globalThis.PaymentSettings;
+  const C = globalThis.PaymentCatalog;
+  // 색은 dataviz 검증(light·dark)을 통과한 순서 그대로. 기타는 늘 마지막 색.
+  const COLORS = [1, 2, 3, 4, 5].map((n) => `var(--series-${n})`);
+  const VIEWS = ['all', 'card', 'category'];
+
+  let series = []; // 지금 보기의 계열 [{ key, label, color }]
+  let view = 'all';
   const HEIGHT = 300;
   const PAD = { top: 28, right: 8, bottom: 30, left: 56 };
   const GAP = 2; // 쌓인 칸 사이 바탕색 틈
@@ -30,23 +33,27 @@
     return node;
   }
 
-  /** 달별 원화 금액 [{ key, label, isCurrent, subscription, one_time, cloud, total }] */
+  const colorsFor = (list) => {
+    let next = 0;
+    return list.map((s) => ({ ...s, color: s.key === 'other' ? COLORS[4] : COLORS[next++] }));
+  };
+
+  /** 달별 원화 금액 [{ key, label, isCurrent, parts: { 계열키: 원 }, total }]. 계열은 series에 채운다. */
   function buildData() {
-    const { getRecords, getCloud, isCovered } = D();
+    const { getRecords, getCloud, getCards, isCovered } = D();
     const cloud = getCloud();
     const usdKrw = cloud.meta.usdKrw;
-    const view = D().cloudView(); // 로컬 달과 UTC 달이 다를 때 이번 달 값을 빼는 처리까지 같은 것
-    return H.monthlyHistory(getRecords(), Date.now(), { months, isCovered }).map((m) => {
+    const cloudNow = D().cloudView(); // 로컬 달과 UTC 달이 다를 때 이번 달 값을 빼는 처리까지 같은 것
+    const cards = getCards ? getCards() : [];
+    const result = H.groupedMonthly(getRecords(), Date.now(), {
+      months, isCovered, usdKrw, by: view,
       // 이번 달 서버·API는 이번 달 화면과 같은 월말 예상값을 쓴다
-      const cloudKRW = m.isCurrent && view.accounts.length ? view.total.projected : H.cloudMonthKRW(cloud.history, m.key, usdKrw).krw;
-      const row = {
-        key: m.key, label: m.label, isCurrent: m.isCurrent,
-        subscription: L.krwTotal(m.subscription, usdKrw).krw,
-        one_time: L.krwTotal(m.one_time, usdKrw).krw,
-        cloud: cloudKRW,
-      };
-      return { ...row, total: row.subscription + row.one_time + row.cloud };
+      cloudKRW: (key, isCurrent) => (isCurrent && cloudNow.accounts.length ? cloudNow.total.projected : H.cloudMonthKRW(cloud.history, key, usdKrw).krw),
+      categoryOf: (r) => { const item = C && C.findBySite(r.site); return item ? item.category : null; },
+      cardLabel: (last4) => { const c = cards.find((x) => x.last4 === last4); return c ? c.label : `카드 ····${last4}`; },
     });
+    series = colorsFor(result.series);
+    return result.months;
   }
 
   // 0부터 시작하는 보기 좋은 눈금(1·2·5 단위)
@@ -76,12 +83,12 @@
   }
 
   function stackOf(d, x, w, scaleY) {
-    const parts = SERIES.filter((s) => d[s.key] > 0);
+    const parts = series.filter((s) => d.parts[s.key] > 0);
     let base = 0;
     return parts.map((s, i) => {
       const y0 = scaleY(base);
-      const y1 = scaleY(base + d[s.key]);
-      base += d[s.key];
+      const y1 = scaleY(base + d.parts[s.key]);
+      base += d.parts[s.key];
       const isTop = i === parts.length - 1;
       const h = Math.max(0, y0 - y1 - (i > 0 ? GAP : 0));
       return svg('path', { d: barPath(x, y1, w, h, isTop), fill: s.color, class: d.isCurrent ? 'is-forecast' : null });
@@ -89,7 +96,7 @@
   }
 
   function tipText(d) {
-    const lines = SERIES.filter((s) => d[s.key] > 0).map((s) => `${s.label} ${won(d[s.key])}`);
+    const lines = series.filter((s) => d.parts[s.key] > 0).map((s) => `${s.label} ${won(d.parts[s.key])}`);
     return `${d.label}${d.isCurrent ? ' (예정 포함)' : ''} · 합계 ${won(d.total)}${lines.length ? ` — ${lines.join(', ')}` : ''}`;
   }
 
@@ -98,7 +105,7 @@
     tip.replaceChildren(
       el('b', {}, `${d.label}${d.isCurrent ? ' · 예정 포함' : ''}`),
       el('span', { class: 'tip-total' }, won(d.total)),
-      ...SERIES.filter((s) => d[s.key] > 0).map((s) => el('span', { class: 'tip-row', style: `--dot: ${s.color}` }, s.label, el('b', {}, won(d[s.key])))));
+      ...series.filter((s) => d.parts[s.key] > 0).map((s) => el('span', { class: 'tip-row', style: `--dot: ${s.color}` }, s.label, el('b', {}, won(d.parts[s.key])))));
     tip.hidden = false;
     const box = $('trend-chart').getBoundingClientRect();
     const left = Math.min(Math.max(x - tip.offsetWidth / 2, 0), box.width - tip.offsetWidth);
@@ -140,10 +147,10 @@
   }
 
   function drawTable(data) {
-    const head = el('tr', {}, el('th', {}, '달'), ...SERIES.map((s) => el('th', { class: 'num' }, s.label)), el('th', { class: 'num' }, '합계'));
+    const head = el('tr', {}, el('th', {}, '달'), ...series.map((s) => el('th', { class: 'num' }, s.label)), el('th', { class: 'num' }, '합계'));
     const rows = data.map((d) => el('tr', {},
       el('td', {}, d.isCurrent ? `${d.label} (예정 포함)` : d.label),
-      ...SERIES.map((s) => el('td', { class: 'num' }, won(d[s.key]))),
+      ...series.map((s) => el('td', { class: 'num' }, won(d.parts[s.key]))),
       el('td', { class: 'num' }, el('b', {}, won(d.total)))));
     $('trend-table').replaceChildren(el('table', {}, el('thead', {}, head), el('tbody', {}, ...rows)));
   }
@@ -171,7 +178,8 @@
     const max = top.length ? top[0].krw : 0;
     $('top-range').textContent = `· 최근 ${months}개월`;
     $('top-list').replaceChildren(...top.map((t) => el('li', {},
-      el('span', { class: 'rank-site' }, t.site),
+      recordAvatar({ site: t.site, kind: 'subscription' }),
+      el('span', { class: 'rank-site' }, serviceName(t.site), serviceName(t.site) !== t.site && el('small', {}, t.site)),
       el('span', { class: 'rank-bar', 'aria-hidden': 'true' }, el('span', { style: `width: ${max ? Math.max(2, Math.round((t.krw / max) * 100)) : 0}%` })),
       el('span', { class: 'rank-amount' }, won(t.krw)))));
     $('top-empty').hidden = top.length > 0;
@@ -181,7 +189,7 @@
     if (!D() || $('page-trends').hidden) return;
     const data = buildData();
     $('trend-tip').hidden = true;
-    $('trend-legend').replaceChildren(...SERIES.map((s) => el('li', { style: `--dot: ${s.color}` }, s.label)));
+    $('trend-legend').replaceChildren(...series.map((s) => el('li', { style: `--dot: ${s.color}` }, s.label)));
     drawChart(data);
     drawTable(data);
     $('trend-table').hidden = !showTable;
@@ -189,6 +197,23 @@
     renderStats(data);
     renderTop();
   }
+
+  function syncViewButtons() {
+    for (const b of $('trend-view').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
+  }
+
+  $('trend-view').addEventListener('click', async (event) => {
+    const btn = event.target.closest('button[data-view]');
+    if (!btn || !VIEWS.includes(btn.dataset.view)) return;
+    view = btn.dataset.view;
+    syncViewButtons();
+    render();
+    try {
+      await ST.saveSettings({ ...(await ST.loadSettings()), trendView: view });
+    } catch (error) {
+      console.error('달마다 보기 저장 실패', error);
+    }
+  });
 
   $('trend-range').addEventListener('click', (event) => {
     const btn = event.target.closest('button[data-months]');
@@ -211,4 +236,9 @@
     resizeTimer = setTimeout(render, 120);
   });
   render();
+  ST.loadSettings().then((s) => {
+    view = s.trendView;
+    syncViewButtons();
+    render();
+  }).catch((error) => console.error('달마다 보기 불러오기 실패', error));
 })();

@@ -92,3 +92,79 @@ test('달별 사용료 합계는 원화로 바꾸고, 못 바꾸면 빼고 표�
   assert.deepEqual(H.cloudMonthKRW(history, '2026-10', null), { krw: 5000, hasUnconverted: true });
   assert.deepEqual(H.cloudMonthKRW(history, '2026-01', 1400), { krw: 0, hasUnconverted: false });
 });
+
+// ---- 달마다 보기: 카드별·분류별 ----
+const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+const KR = (site, fields = {}) => rec({ site, ...fields });
+const catOf = (r) => ({ 'claude.ai': 'ai', 'github.com': 'dev', 'notion.so': 'work', 'netflix.com': 'life', 'vercel.com': 'cloud' }[r.site] || null);
+const opts = { months: 3, usdKrw: 1400, categoryOf: catOf, cloudKRW: (key) => (key === '2026-11' ? 5000 : 0) };
+const mixed = () => [
+  KR('claude.ai', { amount: 20, currency: 'USD', card: { brand: '신한', last4: '1111' } }),
+  KR('github.com', { amount: 4.33, currency: 'USD', card: { brand: '신한', last4: '1111' } }),
+  KR('notion.so', { amount: 12345, card: { brand: '삼성', last4: '2222' } }),
+  KR('netflix.com', { amount: 17000 }),
+  KR('mystery.io', { amount: 3333, card: { brand: '삼성', last4: '2222' } }),
+  rec({ site: 'shop.com', kind: 'one_time', cycle: null, amount: 55555, startedAt: day(10, 3) }),
+];
+
+test('보기마다 달별 합계가 전체 보기와 같다', () => {
+  const all = H.groupedMonthly(mixed(), NOW, { ...opts, by: 'all' });
+  for (const by of ['card', 'category']) {
+    const view = H.groupedMonthly(mixed(), NOW, { ...opts, by });
+    assert.deepEqual(view.months.map((m) => m.total), all.months.map((m) => m.total), by);
+    for (const m of view.months) assert.equal(sum(m.parts), m.total, `${by} ${m.key} 계열 합 = 합계`);
+  }
+  assert.ok(all.months[2].total > 0);
+});
+
+test('전체 보기는 구독·일회성·서버API 세 계열', () => {
+  const all = H.groupedMonthly(mixed(), NOW, { ...opts, by: 'all' });
+  assert.deepEqual(all.series.map((s) => s.key), ['subscription', 'one_time', 'cloud']);
+  assert.equal(all.months[2].parts.cloud, 5000);
+  assert.equal(all.months[2].parts.one_time, 0);
+  assert.equal(all.months[1].parts.one_time, 55555);
+});
+
+test('분류별은 카탈로그 분류를 쓰고 없는 기록은 기타, 연결 사용료는 서버·API', () => {
+  const v = H.groupedMonthly(mixed().filter((r) => r.site !== 'notion.so'), NOW, { ...opts, by: 'category' });
+  const keys = v.series.map((s) => s.key);
+  assert.ok(keys.includes('other'));
+  assert.ok(keys.includes('cloud'));
+  assert.equal(v.series.find((s) => s.key === 'cloud').label, '서버·API');
+  assert.equal(v.series.find((s) => s.key === 'other').label, '기타');
+  assert.equal(v.months[2].parts.cloud, 5000);
+  assert.equal(v.months[2].parts.ai, 28000);
+  assert.equal(v.months[2].parts.other, 3333);
+});
+
+test('계열이 5개를 넘으면 상위 4개 + 기타로 묶고, 합계는 그대로', () => {
+  const v = H.groupedMonthly(mixed(), NOW, { ...opts, by: 'category' });
+  assert.equal(v.series.length, 5);
+  assert.equal(v.series[4].key, 'other');
+  const all = H.groupedMonthly(mixed(), NOW, { ...opts, by: 'all' });
+  assert.deepEqual(v.months.map((m) => m.total), all.months.map((m) => m.total));
+  // 6개 분류: 가장 작은 둘(생활 17000·기타 3333 중 하나 이상)이 기타로 합쳐진다
+  assert.ok(v.months[2].parts.other >= 3333);
+});
+
+test('카드별은 끝 4자리로 나누고 카드 없는 기록은 카드 안 정함', () => {
+  const v = H.groupedMonthly(mixed(), NOW, { ...opts, by: 'card', cardLabel: (l4) => `카드 ${l4}` });
+  const labels = Object.fromEntries(v.series.map((s) => [s.key, s.label]));
+  assert.equal(labels['1111'], '카드 1111');
+  assert.equal(labels.__none, '카드 안 정함');
+  assert.equal(v.months[2].parts['2222'], 12345 + 3333);
+  assert.equal(v.months[2].parts['1111'], 28000 + Math.round(4.33 * 1400));
+});
+
+test('환율 반올림 차이가 있어도 계열 합이 전체 합계와 같다', () => {
+  const recs = [1, 2, 3].map((i) => KR(`s${i}.com`, { amount: 0.37 + i, currency: 'USD', card: { brand: 'a', last4: `000${i}` } }));
+  const v = H.groupedMonthly(recs, NOW, { months: 1, usdKrw: 1333, by: 'card' });
+  const all = H.groupedMonthly(recs, NOW, { months: 1, usdKrw: 1333, by: 'all' });
+  assert.equal(v.months[0].total, all.months[0].total);
+  assert.equal(sum(v.months[0].parts), v.months[0].total);
+});
+
+test('확인 대기 기록은 어느 보기에서도 빠진다', () => {
+  const v = H.groupedMonthly([KR('claude.ai', { review: 'pending' })], NOW, { ...opts, by: 'category' });
+  assert.deepEqual(v.months.map((m) => m.total), [0, 0, 5000 * 0 + 5000]);
+});

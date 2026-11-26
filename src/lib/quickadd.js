@@ -44,26 +44,60 @@
   }
 
   /**
-   * @param {{ item: object, planIndex?: number|null, amount?: string|number }[]} selections
+   * 줄마다 card(null이면 카드 없음)·startedAt을 정했으면 그 값을, 정하지 않았으면(undefined) 공통 값을 쓴다.
+   * @param {{ item: object, planIndex?: number|null, amount?: string|number, card?: object|null, startedAt?: number }[]} selections
    * @param {{ card: {brand:string,last4:string}|null, startedAt: number, now?: number }} opts
    */
   function buildRecords(selections, { card, startedAt, now = Date.now() }) {
     if (selections.length > MAX_BATCH) throw new Error(`한 번에 ${MAX_BATCH}개까지 추가할 수 있어요.`);
-    return selections.map(({ item, planIndex = null, amount }, i) => {
+    return selections.map(({ item, planIndex = null, amount, ...own }, i) => {
+      const rowCard = own.card !== undefined ? own.card : card;
       const plan = item.plans && planIndex != null ? item.plans[planIndex] || null : null;
       const fields = K.recordFields(item, plan);
       return L.createRecord({
         ...fields,
         amount: plan ? fields.amount : parseAmount(amount),
-        card: card ? { brand: card.brand || '카드', last4: card.last4 } : null,
-        startedAt,
+        card: rowCard ? { brand: rowCard.brand || '카드', last4: rowCard.last4 } : null,
+        startedAt: Number.isFinite(own.startedAt) ? own.startedAt : startedAt,
         review: 'confirmed',
         userEdited: true,
       }, now + i); // 같은 밀리초에 만들어도 id가 겹치지 않게
     });
   }
 
-  const api = { MAX_BATCH, dateChoices, preferredCard, buildRecords };
+  // IT인이 많이 쓰는 것: 처음 화면에 먼저 보여 준다(연결 화면으로 가는 곳은 제외)
+  const POPULAR_IDS = ['chatgpt', 'claude', 'cursor', 'midjourney', 'notion', 'figma', 'docker', 'netflix', 'youtube', 'spotify'];
+
+  function popularItems() {
+    return POPULAR_IDS.map((id) => K.ITEMS.find((i) => i.id === id)).filter((i) => i && !i.connect);
+  }
+
+  /** 누르면 바로 담기는 기본값: 첫 요금제(없으면 금액 비움) */
+  function defaultSelection(item) {
+    return { item, planIndex: item.plans && item.plans.length ? 0 : null, amount: '' };
+  }
+
+  /** 고른 것의 월 환산 합계(원). 달러는 환율로 바꾸고, 금액을 모르는 것은 0으로 둔다. */
+  function monthlyTotalKRW(selections, usdKrw) {
+    const byCurrency = selections.reduce((acc, { item, planIndex = null, amount }) => {
+      const plan = item.plans && planIndex != null ? item.plans[planIndex] || null : null;
+      const f = K.recordFields(item, plan);
+      const value = plan ? f.amount : parseAmount(amount);
+      const monthly = L.monthlyEquivalent({ kind: 'subscription', status: 'active', cycle: f.cycle, amount: value });
+      return monthly ? { ...acc, [f.currency]: (acc[f.currency] || 0) + monthly } : acc;
+    }, {});
+    return L.krwTotal(byCurrency, usdKrw).krw;
+  }
+
+  /** 주 버튼 문구 */
+  function submitLabel(selections, usdKrw) {
+    if (!selections.length) return '추가';
+    const total = monthlyTotalKRW(selections, usdKrw);
+    const count = `${selections.length}개 추가`;
+    return total > 0 ? `${count} · 월 ${L.formatMoney(total, 'KRW')}` : count;
+  }
+
+  const api = { MAX_BATCH, POPULAR_IDS, dateChoices, preferredCard, buildRecords, popularItems, defaultSelection, monthlyTotalKRW, submitLabel };
   root.PaymentQuickAdd = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

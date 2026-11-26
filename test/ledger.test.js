@@ -170,3 +170,80 @@ test('sanitizeRecord keeps valid fields and drops malformed ones from the dashbo
   assert.deepEqual(ok.card, { brand: 'Visa', last4: '4242' });
   assert.equal(ok.amount, 10000);
 });
+
+// ---- Step 3: 카드별 이번 달 합계 ----
+const F = require('../src/lib/forecast.js');
+const MNOW = new Date(2026, 10, 14, 15).getTime(); // 11-14 오후
+const mday = (d, m = 10) => new Date(2026, m, d).getTime();
+const VISA = { brand: 'Visa', last4: '1111' };
+const MC = { brand: 'Mastercard', last4: '2222' };
+const monthRecords = () => [
+  sub({ amount: 10000, card: VISA, startedAt: mday(5, 9) }), // 11-05 나간 돈
+  sub({ amount: 20, currency: 'USD', card: MC, startedAt: mday(20, 9) }), // 11-20 나갈 돈
+  L.createRecord({ site: 'shop.com', kind: 'one_time', amount: 30000, currency: 'KRW', review: 'confirmed', card: VISA, startedAt: mday(3) }, mday(3)),
+  sub({ amount: 7000, card: null, startedAt: mday(25, 9) }), // 카드 미지정, 나갈 돈
+  L.createRecord({ site: 'old.com', kind: 'one_time', amount: 999, currency: 'KRW', review: 'confirmed', startedAt: mday(1, 5) }, mday(1, 5)), // 지난 일회성: 제외
+  sub({ amount: 5000, card: VISA, review: 'pending' }), // 미확인: 제외
+  sub({ amount: 8000, card: VISA, status: 'canceled', canceledAt: mday(1, 8), startedAt: mday(9, 7) }), // 해지: 제외
+];
+
+test('cardSummary는 카드별 이번 달 나간 돈·나갈 돈을 구독과 일회성 합쳐 센다', () => {
+  const cards = [L.normalizeCard({ label: '신한', brand: 'Visa', last4: '1111' }, NOW)];
+  const summary = L.cardSummary(monthRecords(), cards, MNOW);
+  const visa = summary.find((c) => c.last4 === '1111');
+  const mc = summary.find((c) => c.last4 === '2222');
+  assert.deepEqual(visa.paid, { KRW: 40000 });
+  assert.deepEqual(visa.due, {});
+  assert.deepEqual(visa.thisMonth, { KRW: 40000 });
+  assert.deepEqual(mc.due, { USD: 20 });
+  assert.equal(mc.registered, false);
+  assert.equal(visa.records.length, 2);
+  assert.equal(new Date(visa.nextCharge).getDate(), 5);
+  assert.equal(new Date(visa.nextCharge).getMonth(), 11);
+});
+
+test('카드별 합계의 합 + 카드 미지정 = 홈 이번 달 예상(서버·API 제외)', () => {
+  const records = [
+    ...monthRecords(),
+    // 이번 달 결제된 뒤 이번 달 안에 해지: 카드·미지정 합계에도 들어가야 한다
+    sub({ amount: 3000, card: VISA, status: 'canceled', startedAt: mday(5, 9), canceledAt: mday(10) }),
+    sub({ amount: 2000, card: null, status: 'canceled', startedAt: mday(6, 9), canceledAt: mday(11) }),
+  ];
+  const cards = [L.normalizeCard({ label: '신한', brand: 'Visa', last4: '1111' }, NOW)];
+  const fx = 1400;
+  const home = F.monthForecast(L.summarize(records, MNOW), { now: 0, projected: 0 }, fx).totalKRW;
+  const perCard = L.cardSummary(records, cards, MNOW).reduce((sum, c) => sum + L.krwTotal(c.thisMonth, fx).krw, 0);
+  const none = L.krwTotal(L.unassignedSummary(records, MNOW).thisMonth, fx).krw;
+  assert.equal(perCard + none, home);
+  assert.equal(none, 9000);
+});
+
+test('unassignedSummary는 카드 없는 확인된 구독·이번 달 일회성만 모은다', () => {
+  const u = L.unassignedSummary(monthRecords(), MNOW);
+  assert.equal(u.count, 1);
+  assert.deepEqual(u.records.map((r) => r.amount), [7000]);
+  assert.deepEqual(u.due, { KRW: 7000 });
+});
+
+test('사용료 연결로 이미 센 기록(isCovered)은 카드 합계에서도 뺀다', () => {
+  const records = monthRecords();
+  const isCovered = (r) => r.site === 'shop.com';
+  const visa = L.cardSummary(records, [], MNOW, { isCovered }).find((c) => c.last4 === '1111');
+  assert.deepEqual(visa.thisMonth, { KRW: 10000 });
+});
+
+test('cardSummary 기본 호출(now 생략)도 기존처럼 count·monthly를 준다', () => {
+  const [c] = L.cardSummary([sub({ card: VISA })], []);
+  assert.equal(c.count, 1);
+  assert.deepEqual(c.monthly, { KRW: 10000 });
+});
+
+test('stampChanged는 새로 넣거나 내용이 바뀐 기록에만 새 수정 시각을 찍는다', () => {
+  const { sanitizeRecord, stampChanged } = require('../src/lib/ledger.js');
+  const base = sanitizeRecord({ id: 'a', site: 'a.com', amount: 1, createdAt: 10, startedAt: 10, updatedAt: 10 });
+  assert.equal(stampChanged(base, [base], 500).updatedAt, 10);
+  assert.equal(stampChanged({ ...base, amount: 2 }, [base], 500).updatedAt, 500);
+  assert.equal(stampChanged(base, [], 500).updatedAt, 500);
+  assert.equal(stampChanged({ ...base, updatedAt: 900 }, [], 500).updatedAt, 900);
+  assert.equal(base.updatedAt, 10);
+});

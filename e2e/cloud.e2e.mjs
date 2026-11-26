@@ -31,6 +31,7 @@ const OPENAI_RESPONSE = {
 };
 
 const context = await chromium.launchPersistentContext('', {
+  reducedMotion: 'reduce', // 금액 카운트업이 끝나기 전 글자를 읽지 않게
   channel: 'chromium',
   executablePath: process.env.CHROMIUM_PATH || undefined,
   headless: true,
@@ -94,6 +95,13 @@ try {
 
   // 4) 합계: AWS 32.77 + OpenAI 4.2 = 36.97달러 × 1400
   await dash.waitForFunction(() => document.querySelector('#cloud-total').textContent === '51,758원');
+  // 4-1) 움직임을 켠 사람: 사용료 합계도 0과 끝값 사이를 거쳐 같은 값에서 멈춘다
+  await dash.emulateMedia({ reducedMotion: 'no-preference' });
+  await dash.reload();
+  await dash.waitForFunction(() => /^[1-9][\d,]*원$/.test(document.querySelector('#cloud-total').textContent)
+    && document.querySelector('#cloud-total').textContent !== '51,758원');
+  await dash.waitForFunction(() => document.querySelector('#cloud-total').textContent === '51,758원');
+  await dash.emulateMedia({ reducedMotion: 'reduce' });
   const costs = await storage('cloudCosts');
   assert.ok(!JSON.stringify(costs).includes('sk-admin'), '화면용 저장소에 비밀값이 섞이면 안 된다');
   const awsCard = await dash.textContent('.cloud-card.provider-aws');
@@ -106,6 +114,29 @@ try {
   assert.equal(await dash.locator('.provider-grid label:has(input[value=azure])').isVisible(), false);
   assert.equal(await dash.locator('.provider-grid label:visible').count(), 5);
   assert.equal(await dash.locator('.provider-chips li', { hasText: 'Azure' }).count(), 0);
+  // 5-b) 이미 저장된 Azure 연결은 앱 ID가 비어 있어도 지우거나 숨기지 않는다(새 연결만 막는다)
+  await dash.click('#cloud-cancel');
+  const [openaiAccount] = (await storage('cloudAccounts')).filter((a) => a.provider === 'openai');
+  const costsNow = await storage('cloudCosts');
+  const azure = { ...openaiAccount, id: 'azure-saved', provider: 'azure', label: '회사 Azure' };
+  await worker.evaluate(async ([acc, cost]) => {
+    const { cloudAccounts, cloudCosts } = await chrome.storage.local.get(['cloudAccounts', 'cloudCosts']);
+    await chrome.storage.local.set({ cloudAccounts: [...cloudAccounts, acc], cloudCosts: { ...cloudCosts, [acc.id]: cost } });
+  }, [azure, { ...costsNow[openaiAccount.id], provider: 'azure', label: '회사 Azure' }]);
+  await dash.waitForSelector('.cloud-card.provider-azure');
+  assert.match(await dash.textContent('.cloud-card.provider-azure'), /회사 Azure/);
+  await dash.click('#cloud-refresh');
+  await dash.waitForFunction(() => !document.querySelector('#cloud-refresh').disabled);
+  assert.ok((await storage('cloudAccounts')).some((a) => a.id === 'azure-saved'), '갱신해도 저장된 Azure 연결이 남는다');
+  assert.equal(await dash.locator('.cloud-card.provider-azure').count(), 1);
+  await worker.evaluate(async () => {
+    const { cloudAccounts, cloudCosts } = await chrome.storage.local.get(['cloudAccounts', 'cloudCosts']);
+    const { 'azure-saved': _drop, ...rest } = cloudCosts;
+    await chrome.storage.local.set({ cloudAccounts: cloudAccounts.filter((a) => a.id !== 'azure-saved'), cloudCosts: rest });
+  });
+  await dash.waitForFunction(() => !document.querySelector('.cloud-card.provider-azure'));
+  await dash.click('#cloud-add');
+
   // 6) 베타 표시: AWS만 없고 나머지 연결 서비스 선택지·카드에는 있다
   const betaOf = (p) => dash.locator(`.provider-grid label:has(input[value=${p}]) .badge-beta`).count();
   assert.equal(await betaOf('aws'), 0);
