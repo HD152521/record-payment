@@ -1,63 +1,82 @@
-/* 방향: 깔끔한 핀테크 앱. 차가운 회색 바탕 위에 흰 카드, 숫자는 크고 굵게, 색은 파랑 하나를 행동(버튼·선택)에만 쓴다.
-   돈의 종류(구독·일회성·서버)는 차트 계열색으로만 가른다. 숫자는 본문 서체의 고정폭 숫자(tabular-nums). */
+/* 방향(B2): 따뜻한 연회색 바탕 위에 1px 선을 두른 흰 칸. 짙은 칸은 "이번 달 총액" 하나만.
+   글씨는 작게(11~13px), 크게 보여 줄 숫자는 총액 하나. 진한 파랑 버튼은 화면마다 하나(추가)만, 나머지는 옅은 회색.
+   돈의 종류(구독·일회성·서버)는 차트 계열색(--series-*)으로만 가른다. 숫자는 고정폭 숫자(tabular-nums). */
 :root {
-  --paper: #f2f4f6;
+  --paper: #f6f6f4;
   --paper-raised: #ffffff;
-  --paper-sunk: #eef1f4;
-  --ink: #191f28;
-  --ink-soft: #4e5968;
-  --ink-faint: #8b95a1;
-  --rule: #e5e8eb;
-  --rule-strong: #d1d6db;
+  --paper-sunk: #f2f2ef;
+  --paper-hover: #fafaf8;
+  --ink: #16181c;
+  --ink-soft: #4a505a;
+  --ink-faint: #80868f;
+  --rule: #ebebe7;
+  --rule-soft: #f1f1ee;
+  --rule-strong: #d9d9d3;
 
   --accent: #3a6df0;
   --accent-hover: #2f5fdc;
-  --accent-soft: #e8efff;
+  --accent-soft: #eef2ff;
+  --accent-line: #dfe7fd;
   --on-accent: #ffffff;
 
   --kind-subscription: #3a6df0;
   --kind-one-time: #c2621a;
-  --kind-card: #b26a00;
-  --kind-unknown: #8b95a1;
+  --kind-card: #a86a00;
+  --kind-unknown: #80868f;
   --cloud: #0f8a6c;
-  --trial: #138a52;
-  --danger: #e5383b;
-  --danger-soft: #fdecec;
-  --warn: #b26a00;
+  --trial: #12875a;
+  --good: #12875a;
+  --good-soft: #e6f6ef;
+  --danger: #d93a40;
+  --danger-soft: #fdeeee;
+  --warn: #9a6200;
+  --warn-soft: #fdf4e3;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #9b5de5;
   --series-5: #b08a1e;
 
+  /* 짙은 칸(이번 달 총액·팝업 머리). 밝은 화면에서도 늘 어둡다 */
+  --night: #15171b;
+  --night-2: #23262d;
+  --night-line: #2d3139;
+  --night-ink: #9aa1ad;
+  --night-ink-2: #7d8590;
+  /* 짙은 칸 전용 강조색(라임). 흰 바탕에서는 글씨가 안 보이니 --night 위 핵심 숫자 한 곳에만 쓴다 */
+  --night-highlight: #d4ff24;
+
   --font-sans: "Pretendard Variable", Pretendard, "SUIT Variable", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", D2Coding, ui-monospace, Consolas, monospace;
 
   --radius-s: 6px;
   --radius: 10px;
-  --radius-l: 12px;
-  --radius-xl: 16px;
-  --shadow: 0 1px 2px rgb(17 24 39 / 0.04), 0 8px 24px -14px rgb(17 24 39 / 0.14);
-  --shadow-lift: 0 2px 6px rgb(17 24 39 / 0.06), 0 24px 48px -20px rgb(17 24 39 / 0.3);
-  --ring: 0 0 0 3px rgb(58 109 240 / 0.25);
+  --radius-l: 10px;
+  --radius-xl: 12px;
+  --shadow: 0 1px 2px rgb(17 24 39 / 0.04);
+  --shadow-lift: 0 2px 6px rgb(17 24 39 / 0.06), 0 20px 44px -20px rgb(17 24 39 / 0.32);
+  --ring: 0 0 0 3px rgb(58 109 240 / 0.22);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration: 160ms;
+  --duration: 150ms;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #101113;
-    --paper-raised: #1b1d21;
-    --paper-sunk: #25282d;
-    --ink: #f2f4f6;
-    --ink-soft: #b0b8c1;
-    --ink-faint: #7e8691;
-    --rule: #2c2f35;
-    --rule-strong: #3d4148;
+    --paper: #111214;
+    --paper-raised: #1a1c20;
+    --paper-sunk: #24272c;
+    --paper-hover: #202328;
+    --ink: #eef0f3;
+    --ink-soft: #b3b9c2;
+    --ink-faint: #858d98;
+    --rule: #2a2d33;
+    --rule-soft: #24272c;
+    --rule-strong: #3a3e45;
     --accent: #5b8cff;
     --accent-hover: #7aa2ff;
-    --accent-soft: #1d2a4a;
+    --accent-soft: #1c2741;
+    --accent-line: #2a3a63;
     --on-accent: #0b1020;
     --kind-subscription: #7aa2ff;
     --kind-one-time: #f0a36b;
@@ -65,15 +84,21 @@
     --kind-unknown: #8f97a3;
     --cloud: #4fd1ad;
     --trial: #5fd394;
+    --good: #5fd394;
+    --good-soft: #17301f;
     --danger: #ff6b6b;
     --danger-soft: #3a1b1d;
     --warn: #f0c36a;
+    --warn-soft: #33290f;
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #a678e8;
     --series-5: #b38f24;
-    --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 10px 28px -16px rgb(0 0 0 / 0.7);
+    --night: #0b0c0e;
+    --night-2: #1d2026;
+    --night-line: #2a2e36;
+    --shadow: 0 1px 0 rgb(255 255 255 / 0.02) inset;
     --shadow-lift: 0 24px 48px -20px rgb(0 0 0 / 0.8);
     --ring: 0 0 0 3px rgb(91 140 255 / 0.35);
     color-scheme: dark;
@@ -88,65 +113,73 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: 13px;
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   word-break: keep-all;
 }
 
-.muted { color: var(--ink-soft); }
+.muted { color: var(--ink-faint); }
 .num, .amount { font-variant-numeric: tabular-nums; }
+.sp, .spacer { flex: 1; }
 
-/* 배지: 테두리 대신 옅은 바탕색 알약 */
+/* 배지: 테두리 없이 옅은 바탕 */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 6px;
   margin-right: 4px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: 4px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.5;
   white-space: nowrap;
   color: var(--ink-soft);
   background: var(--paper-sunk);
 }
-.badge.kind-subscription, .kind-subscription.badge { color: var(--kind-subscription); background: color-mix(in srgb, var(--kind-subscription) 12%, transparent); }
-.badge.kind-one_time { color: var(--kind-one-time); background: color-mix(in srgb, var(--kind-one-time) 12%, transparent); }
-.badge.kind-card_registered { color: var(--kind-card); background: color-mix(in srgb, var(--kind-card) 12%, transparent); }
+.badge.kind-subscription, .kind-subscription.badge { color: var(--kind-subscription); background: color-mix(in srgb, var(--kind-subscription) 11%, transparent); }
+.badge.kind-one_time { color: var(--kind-one-time); background: color-mix(in srgb, var(--kind-one-time) 11%, transparent); }
+.badge.kind-card_registered { color: var(--kind-card); background: color-mix(in srgb, var(--kind-card) 11%, transparent); }
 .badge.kind-unknown { color: var(--kind-unknown); background: var(--paper-sunk); }
 .kind-subscription { color: var(--kind-subscription); }
 .kind-one_time { color: var(--kind-one-time); }
 .kind-card_registered { color: var(--kind-card); }
 .kind-unknown { color: var(--kind-unknown); }
-.badge.trial { color: var(--trial); background: color-mix(in srgb, var(--trial) 12%, transparent); }
+.badge.trial { color: var(--trial); background: color-mix(in srgb, var(--trial) 11%, transparent); }
 .badge.canceled { color: var(--ink-faint); }
 
-/* 버튼: 주 행동은 파랑 하나, 나머지는 회색 바탕 */
+/* 버튼: .btn = 진한 파랑(화면에 하나), .btn.ghost/.soft = 옅은 회색, .btn.link = 글자만 + → */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  min-height: 40px;
-  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 34px;
+  padding: 7px 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--accent);
   color: var(--on-accent);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--duration) var(--ease), transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+  text-decoration: none;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.2) inset, 0 4px 12px -6px rgb(58 109 240 / 0.8);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 .btn:hover { background: var(--accent-hover); }
 .btn:active { transform: scale(0.97); }
-.btn.small { min-height: 34px; padding: 6px 12px; font-size: 13px; border-radius: 7px; }
-.btn.ghost { background: var(--paper-sunk); color: var(--ink); }
-.btn.ghost:hover { background: color-mix(in srgb, var(--ink) 9%, var(--paper-sunk)); }
-.btn.danger { background: var(--danger-soft); color: var(--danger); }
+.btn.small { min-height: 28px; padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+.btn.ghost, .btn.soft { background: var(--paper-sunk); color: var(--ink-soft); box-shadow: none; }
+.btn.ghost:hover, .btn.soft:hover { background: color-mix(in srgb, var(--ink) 7%, var(--paper-sunk)); color: var(--ink); }
+.btn.soft { min-height: 26px; padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+.btn.link { background: none; box-shadow: none; color: var(--ink-faint); min-height: 0; padding: 4px 6px; font-size: 12px; }
+.btn.link:hover { color: var(--ink); background: none; }
+.btn.link.arrow::after { content: " →"; }
+.btn.danger { background: var(--danger-soft); color: var(--danger); box-shadow: none; }
 .btn.danger:hover { background: color-mix(in srgb, var(--danger) 16%, var(--paper-raised)); }
 .btn.danger.ghost { background: transparent; }
 .btn.danger.ghost:hover { background: var(--danger-soft); }
@@ -155,12 +188,44 @@ body {
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .icon-btn {
-  display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0;
-  border: 0; border-radius: 999px; background: transparent; color: var(--ink-faint);
+  display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 7px; background: transparent; color: var(--ink-faint);
   font: inherit; font-size: 13px; cursor: pointer;
   transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 .icon-btn:hover { background: var(--paper-sunk); color: var(--ink); }
+
+/* 칸(타일): 흰 바탕 + 1px 선 */
+.tile {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  min-width: 0;
+}
+.tile-head { display: flex; align-items: center; gap: 8px; margin: -2px 0 12px; min-width: 0; }
+.tile-head h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+.tile-head small { color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* 로고 아바타(lib/catalog avatarFor): 확장 안 SVG를 마스크로 칠한다(외부 이미지 없음) */
+.avatar {
+  flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 8px; font-size: 12px; font-weight: 800; text-transform: uppercase;
+  color: currentColor; background: color-mix(in srgb, currentColor 11%, transparent);
+}
+.avatar.brand.has-icon { background: var(--paper-sunk); position: relative; }
+.avatar.brand.has-icon::before {
+  content: ''; width: 54%; height: 54%; background: var(--brand);
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat;
+}
+.avatar.brand.is-letter { background: var(--brand); color: #fff; }
+
+/* 작은 칩: D-day, 카드 */
+.chip { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--paper-sunk); color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip.hot { background: var(--danger-soft); color: var(--danger); }
+.cardchip { display: inline-flex; gap: 5px; align-items: center; flex: none; font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+.cardchip::before { content: ""; width: 14px; height: 10px; border-radius: 2px; background: linear-gradient(135deg, #2b2f37, #555b66); }
+.cardchip.none::before { background: none; border: 1px dashed var(--ink-faint); }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden;

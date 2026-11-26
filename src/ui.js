@@ -27,6 +27,24 @@
     return el('span', { class: cls, style: `--brand:${color};--logo:url(../${a.icon})`, 'aria-hidden': 'true' });
   }
 
+  // www. 를 뺀 사이트 이름 첫 글자. 목록에서 줄을 눈으로 빨리 찾게 하는 표시일 뿐이다.
+  const siteInitial = (site) => (String(site || '?').replace(/^www\./, '').match(/[\p{L}\p{N}]/u) || ['?'])[0];
+
+  /** 기록의 아바타: 목록에 있는 서비스면 로고, 아니면 유형 색 첫 글자 */
+  function recordAvatar(r) {
+    const item = root.PaymentCatalog && root.PaymentCatalog.findBySite(r.site);
+    return item ? brandAvatar(item, `kind-${r.kind}`) : el('span', { class: `avatar kind-${r.kind}`, 'aria-hidden': 'true' }, siteInitial(r.site));
+  }
+
+  /** 화면에 보일 이름: 목록에 있으면 서비스 이름(Netflix), 없으면 사이트 주소 */
+  function serviceName(site) {
+    const item = root.PaymentCatalog && root.PaymentCatalog.findBySite(site);
+    return item ? item.name : site;
+  }
+
+  /** 며칠 뒤인지 짧게: 오늘 · 내일 · 4일 뒤 */
+  const ddayText = (days) => (days <= 0 ? '오늘' : days === 1 ? '내일' : `${days}일 뒤`);
+
   function formatTotals(byCurrency) {
     // 0인 통화는 빼고 보여 준다("0원 + $100.00" 대신 "$100.00")
     const entries = Object.entries(byCurrency).filter(([, v]) => v);
@@ -127,7 +145,7 @@
   const FALLBACK_FX_AS_OF = '2026-11';
   const withFallbackFx = (meta) => (meta && meta.usdKrw ? meta : { ...(meta || {}), usdKrw: FALLBACK_USD_KRW, fxFallback: true });
 
-  root.PaymentUI = { el, brandAvatar, formatTotals, amountText, kindBadge, formatDate, formatTime, cloudOverview, toast, dismissToast, radioChip, checkedValue, checkRadio,
+  root.PaymentUI = { el, brandAvatar, recordAvatar, serviceName, siteInitial, ddayText, formatTotals, amountText, kindBadge, formatDate, formatTime, cloudOverview, toast, dismissToast, radioChip, checkedValue, checkRadio,
     FALLBACK_USD_KRW, FALLBACK_FX_AS_OF, withFallbackFx,
   };
 })(globalThis);

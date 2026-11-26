@@ -118,3 +118,23 @@ test('주 버튼 문구: 0개면 "추가", 금액이 있으면 "N개 추가 · �
   assert.equal(Q.submitLabel([{ item: item('netflix'), planIndex: 1, amount: '' }], 1400), '1개 추가 · 월 13,500원');
   assert.equal(Q.submitLabel([{ item: item('gcp'), planIndex: null, amount: '' }], 1400), '1개 추가');
 });
+
+test('줄마다 정한 카드·결제일이 있으면 그 값을, 없으면 공통 값을 쓴다', () => {
+  const shared = { card: { brand: 'Visa', last4: '4242' }, startedAt: day(11, 1), now: NOW };
+  const [netflix, cursor, notion] = Q.buildRecords([
+    { item: item('netflix'), planIndex: 0, card: { brand: 'Master', last4: '9999' }, startedAt: day(11, 10) },
+    { item: item('cursor'), planIndex: 0, card: null },
+    { item: item('notion'), planIndex: 0 },
+  ], shared);
+  assert.deepEqual(netflix.card, { brand: 'Master', last4: '9999' });
+  assert.equal(netflix.startedAt, day(11, 10));
+  assert.equal(cursor.card, null, '줄에서 카드 없음으로 고르면 공통 카드를 쓰지 않는다');
+  assert.equal(cursor.startedAt, day(11, 1));
+  assert.deepEqual(notion.card, { brand: 'Visa', last4: '4242' });
+  assert.equal(notion.startedAt, day(11, 1));
+});
+
+test('줄마다 정한 결제일이 숫자가 아니면 공통 결제일을 쓴다', () => {
+  const [r] = Q.buildRecords([{ item: item('netflix'), planIndex: 0, startedAt: 'x' }], { card: null, startedAt: day(11, 1), now: NOW });
+  assert.equal(r.startedAt, day(11, 1));
+});

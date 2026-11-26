@@ -4,60 +4,47 @@
   <meta charset="utf-8">
   <title>결제 기록장</title>
   <link rel="stylesheet" href="theme.css">
-  <style>
-    body { width: 340px; padding: 16px; background: var(--paper); }
-    .brand { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; font-weight: 700; }
-    .brand-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-s); background: var(--accent); color: var(--on-accent); font-size: 12px; }
-    .card { margin: 0 0 10px; padding: 14px 16px; border-radius: var(--radius-l); background: var(--paper-raised); box-shadow: var(--shadow); }
-    .eyebrow { margin: 0; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-    .total { margin: 2px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.15; color: var(--ink); font-variant-numeric: tabular-nums; }
-    .paid-bar { height: 6px; margin: 12px 0 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, var(--paper-sunk)); overflow: hidden; }
-    .paid-bar[hidden] { display: none; }
-    .paid-bar span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
-    .split-legend { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--ink-soft); }
-    .split-legend:empty { display: none; }
-    .split-legend li { display: inline-flex; align-items: center; gap: 6px; }
-    .split-legend li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
-    .split-legend li.is-due::before { background: color-mix(in srgb, var(--accent) 25%, var(--paper-sunk)); }
-    .split-legend b { color: var(--ink); font-variant-numeric: tabular-nums; }
-    .sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-    .sub:empty { display: none; }
-    .pending { margin: 8px 0 0; padding: 6px 10px; border-radius: var(--radius-s); background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; }
-    .pending[hidden] { display: none; }
-    h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 6px; font-size: 13px; }
-    h2 .muted { font-size: 12px; font-weight: 500; color: var(--ink-faint); }
-    ul.upcoming { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-    ul.upcoming li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--rule); }
-    ul.upcoming li:first-child { border-top: 0; }
-    .when { flex: none; min-width: 44px; padding: 3px 6px; border-radius: var(--radius-s); background: var(--paper-sunk); text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-    li.is-soon .when { background: var(--accent-soft); color: var(--accent); }
-    .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-    .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .empty { color: var(--ink-soft); font-size: 12px; }
-    .btn { width: 100%; min-height: 38px; margin-top: 2px; }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <p class="brand"><span class="brand-mark" aria-hidden="true">₩</span>결제 기록장</p>
-  <section class="card" aria-labelledby="total-h">
-    <h1 class="eyebrow" id="total-h">이번 달 예상 · 원화 환산</h1>
-    <p class="total" id="total">0원</p>
-    <div class="paid-bar" id="paid-bar" role="img" hidden><span id="paid-fill"></span></div>
-    <ul class="split-legend" id="split-legend"></ul>
+  <header class="phead">
+    <p class="site-brand"><span class="brand-mark" aria-hidden="true">₩</span>결제 기록장</p>
+    <span class="sp"></span>
+    <button type="button" class="btn soft" id="open">대시보드</button>
+  </header>
+
+  <section class="phero" aria-labelledby="total-h">
+    <h1 class="eyebrow" id="total-h"><span id="p-month">이번 달</span> 예상 지출 · 원화 환산</h1>
+    <p class="big num" id="total">0원</p>
+    <p class="delta" id="delta"></p>
+    <div class="pbar" id="pbar" role="img" hidden><i id="pbar-fill"></i></div>
+    <div class="pmeta" id="pmeta" hidden><span id="pmeta-left"></span><span id="pmeta-right"></span></div>
     <p class="sub" id="cloud-line"></p>
-    <p class="pending" id="pending" hidden></p>
   </section>
-  <section class="card" aria-labelledby="upcoming-h">
-    <h2 id="upcoming-h">곧 나갈 돈 <span class="muted" id="soon-total"></span></h2>
+
+  <button type="button" class="alert" id="alert" hidden>
+    <span class="ico" id="alert-ico" aria-hidden="true">!</span>
+    <span class="alert-t"><b id="alert-title"></b><span id="alert-sub"></span></span>
+  </button>
+
+  <section class="sec" aria-labelledby="upcoming-h">
+    <h2 id="upcoming-h">곧 나갈 돈<span class="sp"></span><span class="muted" id="soon-total"></span></h2>
     <ul class="upcoming" id="upcoming"></ul>
   </section>
-  <button type="button" class="btn" id="open">전체 대시보드 열기</button>
+
+  <footer class="foot">
+    <button type="button" class="btn" id="quick-add">＋ 빠른 추가</button>
+    <button type="button" class="btn soft" id="open-records">전체 기록</button>
+  </footer>
   <script src="lib/detect.js"></script>
   <script src="lib/ledger.js"></script>
   <script src="lib/catalog.js"></script>
   <script src="lib/store.js"></script>
   <script src="lib/cloud/costs.js"></script>
   <script src="lib/forecast.js"></script>
+  <script src="lib/history.js"></script>
+  <script src="lib/settings.js"></script>
+  <script src="lib/home.js"></script>
   <script src="lib/motion.js"></script>
   <script src="ui.js"></script>
   <script src="popup.js"></script>

@@ -6,7 +6,6 @@
   --provider-cloudflare: #c2410c;
   --provider-github: #24292f;
   --provider-vercel: #000000;
-  --warn: #8a5a00;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -16,45 +15,45 @@
     --provider-cloudflare: #fb923c;
     --provider-github: #c9d1d9;
     --provider-vercel: #ededed;
-    --warn: #f0c36a;
   }
 }
 
 .cloud {
-  position: relative; margin-top: 24px; padding: 28px 28px 24px;
-  background: var(--paper-raised); border-radius: var(--radius-xl); box-shadow: var(--shadow); overflow: hidden;
+  position: relative; margin-top: 18px; padding: 18px 18px 16px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden;
 }
 .cloud-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
-.cloud-accounts:not(:empty) { margin-top: 20px; }
+.cloud-accounts:not(:empty) { margin-top: 16px; }
 .cloud-head h2 { margin: 0; }
 .cloud-total {
   margin: 4px 0 0;
-  font-size: clamp(28px, 3.6vw, 38px);
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.04em;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.cloud-sub { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.cloud-sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .cloud-sub:empty { display: none; }
 .cloud-updated { font-size: 12px; }
 
 .cloud-accounts {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
 }
 .cloud-card {
   --provider-color: var(--ink-soft);
   position: relative;
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 18px 18px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 14px 12px;
   background: var(--paper-raised);
-  border: 1.5px solid var(--rule);
-  border-radius: var(--radius-l);
-  transition: transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--provider-color);
+  border-radius: var(--radius);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
 }
-.cloud-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.cloud-card:hover { background: var(--paper-hover); }
 .provider-aws { --provider-color: var(--provider-aws); }
 .provider-azure { --provider-color: var(--provider-azure); }
 .provider-openai { --provider-color: var(--provider-openai); }
@@ -63,22 +62,26 @@
 .provider-vercel { --provider-color: var(--provider-vercel); }
 .cloud-card header { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .badge.provider { color: var(--provider-color); }
-.cloud-label { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-mtd { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.cloud-mtd small, .figures small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--ink-soft); }
-.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.figures dt { font-size: 12px; color: var(--ink-soft); }
-.figures dd { margin: 0; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cloud-label { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-mtd { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cloud-mtd small, .figures small { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--ink-faint); }
+.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); }
+.figures dt { font-size: 11px; color: var(--ink-faint); }
+.figures dd { margin: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .figures small { display: block; margin: 0; }
-.cloud-card .receipt li { padding: 4px 0; font-size: 13px; }
+.cloud-card .receipt { list-style: none; margin: 0; padding: 0; }
+.cloud-card .receipt li { display: flex; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--ink-soft); }
+.cloud-card .receipt .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-card .receipt .leader { display: none; }
+.cloud-card .receipt .amount { font-weight: 600; color: var(--ink); }
 .cloud-card footer { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-top: auto; }
 .cloud-card .error, .status.error { margin: 0; color: var(--danger); font-size: 13px; }
 .cloud-card .warn { margin: 0; color: var(--warn); font-size: 12px; }
-.cloud-card.has-error { outline: 1.5px solid color-mix(in srgb, var(--danger) 55%, transparent); outline-offset: -1.5px; }
-.cloud .empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 18px 0 0; padding: 14px 16px; text-align: left; background: var(--paper-sunk); border: 0; border-radius: var(--radius); font-size: 13px; }
+.cloud-card.has-error { border-color: color-mix(in srgb, var(--danger) 45%, var(--rule)); border-top-color: var(--danger); }
+.cloud .empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 16px 0 0; padding: 12px 14px; text-align: left; background: var(--paper-sunk); border: 0; border-radius: 8px; font-size: 12px; color: var(--ink-soft); }
 .cloud .empty[hidden] { display: none; }
 .provider-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.provider-chips li { padding: 2px 9px; border-radius: 999px; background: var(--paper-sunk); color: var(--ink); font-size: 12px; font-weight: 600; }
+.provider-chips li { padding: 1px 8px; border-radius: 4px; background: var(--paper-raised); color: var(--ink); font-size: 11px; font-weight: 600; }
 
 /* 연결 대화상자 */
 #cloud-dialog { width: min(560px, calc(100vw - 32px)); }
@@ -87,8 +90,8 @@
 .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
 .provider-grid label {
   position: relative; flex-direction: row; justify-content: center; margin: 0; padding: 12px 0; cursor: pointer;
-  font-size: 14px; font-weight: 700; color: var(--ink-soft);
-  background: var(--paper-raised); border: 1.5px solid var(--rule); border-radius: var(--radius);
+  font-size: 13px; font-weight: 600; color: var(--ink-soft);
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 8px;
   transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 .provider-grid label:hover { border-color: var(--rule-strong); color: var(--ink); }
@@ -103,7 +106,7 @@
   border-radius: 50%; background: var(--accent); color: var(--on-accent);
   font-family: var(--font-mono); font-size: 11px;
 }
-.wizard-guide { margin-bottom: 16px; padding: 14px 16px; background: var(--paper-sunk); border: 0; border-radius: var(--radius); }
+.wizard-guide { margin-bottom: 16px; padding: 12px 14px; background: var(--paper-sunk); border: 0; border-radius: 8px; }
 .wizard-open { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
 .wizard-open .hint { margin: 0; }
 .wizard-links { margin: 0; font-size: 12px; color: var(--ink-soft); }
@@ -118,7 +121,7 @@
 .gh-device { margin-top: 8px; padding: 10px 12px; border-left: 3px solid var(--cloud); background: var(--paper); border-radius: var(--radius); }
 .gh-device p { margin: 0 0 4px; font-size: 14px; }
 .gh-device code { font-family: var(--font-mono); font-size: 18px; font-weight: 600; letter-spacing: 0.08em; }
-.steps { margin: 0 0 14px; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+.steps { margin: 0 0 12px; padding-left: 20px; font-size: 12px; line-height: 1.6; }
 .steps li { margin-bottom: 6px; }
 .steps a { color: var(--accent); }
 .steps code { font-family: var(--font-mono); font-size: 12px; }

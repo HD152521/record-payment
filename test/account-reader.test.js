@@ -165,3 +165,11 @@ test('보안: 계정 페이지 읽기 스크립트는 content script 규칙을 �
     assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML/.test(fs.readFileSync(path.join(root, f), 'utf8')), `${f}: 페이지 글을 HTML로 넣지 않아요`);
   }
 });
+
+test('decideOffer: 같은 사이트라도 구독이 아닌 기록(한 번 결제·카드 등록)은 막지 않는다', () => {
+  const yt = { ...offer, siteId: 'youtube' };
+  const rental = have({ site: 'youtube.com', kind: 'one_time' });
+  const cardReg = have({ site: 'www.youtube.com', kind: 'card_registered' });
+  assert.equal(AO.decideOffer(yt, [rental, cardReg], {}, NOW).show, true);
+  assert.equal(AO.decideOffer(yt, [have({ site: 'youtube.com' })], {}, NOW).show, false);
+});

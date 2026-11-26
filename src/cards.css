@@ -1,37 +1,42 @@
 /* 내 카드 화면. 고르기·시트 부품은 sheet.css. */
-/* 내 카드: 카드 화면의 주인공이라 한 장씩 크게 */
-.cards { margin-top: 24px; padding: 24px; }
-.cards h1 { font-size: 22px; }
-.cards .card-list { margin-top: 8px; }
-.cards .card-list li { padding: 14px 0; gap: 14px; font-size: 15px; }
-.cards .card-chip { width: 64px; height: 42px; font-size: 11px; border-radius: 7px; }
-.cards .card-chip::before { top: 9px; left: 9px; width: 13px; height: 10px; }
-/* 내 카드 */
-.cards-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.cards { margin-top: 18px; padding: 16px 18px; }
+.cards-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
 .cards-head h2 { margin: 0; }
-.card-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
-.card-list li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-.card-list li:last-child { border-bottom: 0; }
+.card-list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.card-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule-soft); }
+.card-list li:first-child { border-top: 0; }
+.cards .card-list { margin-top: 4px; }
 /* 작은 카드 그림: 끝 4자리만. 등록 안 한(기록에서만 본) 카드는 점선 */
 .card-chip {
-  flex: none; position: relative; width: 44px; height: 30px; padding: 0 5px 3px;
+  flex: none; position: relative; width: 44px; height: 28px; padding: 0 5px 3px;
   display: flex; align-items: flex-end; justify-content: flex-end;
   border-radius: 5px; background: linear-gradient(135deg, #1f2a44 0%, #3a6df0 140%);
-  color: #fff; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em;
+  color: #fff; font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
 }
 .card-chip::before { content: ""; position: absolute; top: 6px; left: 6px; width: 9px; height: 7px; border-radius: 2px; background: #d8b45a; }
-.is-unregistered .card-chip { background: transparent; color: var(--ink-soft); border: 1px dashed var(--ink-faint); }
+.card-list li:nth-child(2) .card-chip { background: linear-gradient(135deg, #111827, #4b5563); }
+.is-unregistered .card-chip { background: transparent; color: var(--ink-faint); border: 1px dashed var(--ink-faint); }
 .is-unregistered .card-chip::before { background: var(--rule); }
 .card-list li.is-unregistered .card-label { color: var(--ink-soft); }
 .card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .card-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-meta { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-meta { font-size: 12px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-list .amount { font-weight: 700; font-size: 13px; text-align: right; }
+.card-list .link { color: var(--ink-faint); padding: 4px 6px; border-radius: var(--radius-s); }
+.card-list .link:hover { color: var(--ink); background: var(--paper-sunk); text-decoration: none; }
 .card-open { background: none; border: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.card-open:hover .card-label { color: var(--accent); }
 .card-open:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; border-radius: 6px; }
-.card-unassigned { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; padding: 10px 12px; font-size: 13px; border: 1px dashed var(--ink-faint); border-radius: 8px; }
-.card-detail-total { margin: 0; font-size: 22px; font-weight: 700; }
-.card-detail-list { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
-.card-detail-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.card-unassigned { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; padding: 8px 10px 8px 12px; font-size: 12px; color: var(--ink-soft); background: var(--paper-sunk); border-radius: 8px; }
+.card-unassigned[hidden] { display: none; }
+.card-unassigned .btn.soft { background: var(--paper-raised); }
+.card-detail-total { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+#card-detail-sub { margin: 4px 0 0; font-size: 12px; }
+.card-detail-list { list-style: none; margin: 12px 0 16px; padding: 0; font-size: 13px; }
+.card-detail-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--rule-soft); }
+.card-detail-list li:first-child { border-top: 0; }
 .card-detail-list .card-label { flex: 1; }
-.card-assign { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; }
+.card-detail-list input { width: 16px; height: 16px; accent-color: var(--accent); }
+.card-assign { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; padding: 10px 12px; font-size: 12px; background: var(--paper-sunk); border-radius: 8px; }
+.card-assign label { flex-direction: row !important; align-items: center; margin: 0 !important; }
+.card-assign select { min-height: 32px !important; padding: 4px 10px !important; font-size: 13px !important; background: var(--paper-raised) !important; }

@@ -15,7 +15,7 @@ const { SITES: ACCOUNT_SITES } = require('../src/lib/account-reader.js');
 
 const PRIVACY_URL = 'https://hd152521.github.io/record-payment/privacy.html';
 const MAX_SHORT = 132;
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const PINNED_PERMISSIONS = ['storage', 'webNavigation', 'alarms', 'scripting', 'notifications'];
 
 function section(title) {
@@ -33,7 +33,7 @@ test(`manifest·package.json·package-lock.json 버전이 ${VERSION}으로 같�
   assert.equal(lockfile.packages[''].version, VERSION);
 });
 
-test('권한 목록은 v0.4.0과 같다(v0.5.0에서 권한을 더하지 않았다)', () => {
+test('권한 목록은 v0.4.0과 같다(v0.5.0·v0.6.0에서 권한을 더하지 않았다)', () => {
   assert.deepEqual(manifest.permissions, PINNED_PERMISSIONS);
   assert.deepEqual(manifest.host_permissions, ['<all_urls>']);
 });

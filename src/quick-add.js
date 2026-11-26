@@ -55,7 +55,42 @@
       hasRecord(item) && el('span', { class: 'badge' }, '기록 있음'),
       el('span', { class: 'picker-hint' }, itemHint(item)),
       !item.connect && el('span', { class: 'picker-check', 'aria-hidden': 'true' }, on ? '✓' : '+')),
-      entry && el('div', { class: 'picker-detail' }, planControl(entry)));
+      entry && el('div', { class: 'picker-detail' }, planControl(entry), rowOwnControl(entry)));
+  }
+
+  // ── 줄마다 카드·결제일: 정하지 않으면(undefined) 아래 공통 값을 쓴다 ─────────
+  const SHARED = '';
+  const NO_CARD = 'none';
+  const toInput = (ts) => new Date(ts - new Date(ts).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const cardList = () => L.cardSummary(dash().getRecords(), cards);
+
+  function rowCardValue(p) {
+    if (p.card === undefined) return SHARED;
+    return p.card ? p.card.last4 : NO_CARD;
+  }
+
+  function onRowCard(p, value) {
+    const known = cardList().find((c) => c.last4 === value);
+    const card = value === SHARED ? undefined : (known ? { brand: known.brand || '카드', last4: known.last4 } : null);
+    update(p.item.id, { card });
+  }
+
+  function onRowDate(p, value) {
+    update(p.item.id, { startedAt: value ? new Date(`${value}T00:00:00`).getTime() : undefined });
+  }
+
+  function rowOwnControl(p) {
+    const current = rowCardValue(p);
+    const option = (value, label) => el('option', { value, selected: value === current }, label);
+    return el('div', { class: 'row-own' },
+      el('label', {}, '카드',
+        el('select', { 'aria-label': `${p.item.name} 결제 카드`, onchange: (e) => onRowCard(p, e.target.value) },
+          option(SHARED, '공통 카드'),
+          ...cardList().map((c) => option(c.last4, c.label.includes(c.last4) ? c.label : `${c.label} ····${c.last4}`)),
+          option(NO_CARD, '카드 없음'))),
+      el('label', {}, '첫 결제일',
+        el('input', { type: 'date', 'aria-label': `${p.item.name} 첫 결제일`, value: Number.isFinite(p.startedAt) ? toInput(p.startedAt) : null,
+          onchange: (e) => onRowDate(p, e.target.value) })));
   }
 
   function renderList() {
@@ -120,7 +155,7 @@
   }
 
   function renderCardChips() {
-    const list = L.cardSummary(dash().getRecords(), cards);
+    const list = cardList();
     $('tray-cards').replaceChildren(
       ...list.map((c) => radioChip('trayCard', c.last4, c.label.includes(c.last4) ? c.label : `${c.label} ····${c.last4}`)),
       radioChip('trayCard', '', list.length ? '선택 안 함' : '카드 없이'));
@@ -128,7 +163,6 @@
   }
 
   function renderDateChips() {
-    const toInput = (ts) => new Date(ts - new Date(ts).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     $('tray-dates').replaceChildren(
       ...Q.dateChoices(Date.now()).map((c) => radioChip('trayDateChip', String(c.ts), c.label)),
       radioChip('trayDateChip', CUSTOM_DATE, '날짜 고르기'));
@@ -149,7 +183,7 @@
   function chosenCard() {
     const last4 = checkedValue(form(), 'trayCard');
     if (!last4) return null;
-    const known = L.cardSummary(dash().getRecords(), cards).find((c) => c.last4 === last4);
+    const known = cardList().find((c) => c.last4 === last4);
     return { brand: (known && known.brand) || '카드', last4 };
   }
 
@@ -188,12 +222,16 @@
 
   $('add-btn').addEventListener('click', () => openPicker().catch(fail));
   form().elements.q.addEventListener('input', renderList);
-  // 검색칸에서 Enter: 맨 위 결과를 담고 검색칸을 비운다. 빈 칸에서 Enter는 아무것도 하지 않는다(실수로 저장되지 않게).
+  // 검색칸에서 Enter: 맨 위 결과를 담고 검색칸을 비운다. 이미 담긴 것은 빼지 않는다(Enter로 고른 걸 잃지 않게).
+  // 빈 칸에서 Enter는 아무것도 하지 않는다(실수로 저장되지 않게).
   form().elements.q.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const [first] = visibleItems();
-    if (e.target.value.trim() && first) { toggle(first); e.target.value = ''; renderList(); }
+    if (!e.target.value.trim() || !first) return;
+    if (!isPicked(first)) toggle(first);
+    e.target.value = '';
+    renderList();
   });
   $('tray-dates').addEventListener('change', (e) => {
     form().elements.trayDate.hidden = e.target.value !== CUSTOM_DATE;
@@ -206,8 +244,10 @@
     // 하나만 담았으면 고른 요금제·카드·결제일을 채운 자세한 양식으로, 아니면 빈 양식으로
     if (picked.length === 1) {
       const plan = only.planIndex != null ? only.item.plans[only.planIndex] : null;
-      const startedAt = (() => { try { return chosenDate(); } catch { return Date.now(); } })();
-      dash().openEditor(null, { title: only.item.name, fields: { ...K.recordFields(only.item, plan), card: chosenCard(), startedAt }, planIndex: only.planIndex });
+      const shared = (() => { try { return chosenDate(); } catch { return Date.now(); } })();
+      const startedAt = Number.isFinite(only.startedAt) ? only.startedAt : shared;
+      const card = only.card !== undefined ? only.card : chosenCard();
+      dash().openEditor(null, { title: only.item.name, fields: { ...K.recordFields(only.item, plan), card, startedAt }, planIndex: only.planIndex });
     } else {
       dash().openEditor(null);
     }
@@ -218,4 +258,16 @@
     dash().openEditor(null, { title: name, fields: { site: name, kind: 'subscription' } });
   });
   $('picker-cancel').addEventListener('click', () => $('picker').close());
+
+  // 팝업의 "빠른 추가": 세션 저장소에 막 찍힌 시각이 있으면 고르기 화면을 연다(한 번 쓰고 지운다).
+  const QUICK_ADD_FRESH_MS = 15000;
+  async function openIfAsked(at) {
+    if (!at || Date.now() - at > QUICK_ADD_FRESH_MS || $('picker').open) return;
+    await chrome.storage.session.remove('quickAddAt');
+    await openPicker();
+  }
+  chrome.storage.session.get('quickAddAt').then(({ quickAddAt }) => openIfAsked(quickAddAt)).catch(fail);
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'session' && changes.quickAddAt && changes.quickAddAt.newValue) openIfAsked(changes.quickAddAt.newValue).catch(fail);
+  });
 })();

@@ -163,6 +163,36 @@ try {
   assert.doesNotMatch(await dash.textContent('#yearly-total'), /\+/);
   assert.equal(await dash.isVisible('#last4-row'), false);
 
+  // 5-b) Enter는 이미 담은 것을 빼지 않는다 + 줄마다 카드·결제일을 따로 정한다(안 정한 줄은 아래 공통 값)
+  const before = await stored('records');
+  await dash.click('#add-btn');
+  const q = '#picker-form [name=q]';
+  await dash.fill(q, '노션');
+  await dash.press(q, 'Enter');
+  await dash.fill(q, '노션');
+  await dash.press(q, 'Enter');
+  assert.match(await dash.textContent('#picker-tray h3'), /고른 것 1개/, '두 번째 Enter에서 빠지지 않는다');
+  await dash.fill(q, '피그마');
+  await dash.press(q, 'Enter');
+  assert.match(await dash.textContent('#picker-tray h3'), /고른 것 2개/);
+  await dash.fill(q, '노션');
+  await dash.selectOption('select[aria-label="Notion 결제 카드"]', '1111');
+  await dash.fill('input[aria-label="Notion 첫 결제일"]', '2026-11-20');
+  await dash.dispatchEvent('input[aria-label="Notion 첫 결제일"]', 'change');
+  await dash.fill(q, '');
+  await dash.click('#tray-cards label:has(input[value="4242"])');
+  await dash.click('#picker-submit');
+  await dash.waitForFunction((n) => document.querySelectorAll('#rows tr').length === n, before.length + 2);
+  const rows = await stored('records');
+  const notion = rows.find((r) => r.site === 'notion.so');
+  const figma = rows.find((r) => r.site === 'figma.com');
+  assert.equal(notion.card.last4, '1111');
+  assert.equal(notion.startedAt, new Date(2026, 10, 20).getTime());
+  assert.equal(figma.card.last4, '4242', '따로 안 정한 줄은 공통 카드');
+  assert.notEqual(figma.startedAt, notion.startedAt);
+  await worker.evaluate((r) => chrome.storage.local.set({ records: r }), before);
+  await dash.waitForFunction((n) => document.querySelectorAll('#rows tr').length === n, before.length);
+
   // 6) AWS는 담지 않고 연결 화면으로
   await dash.click('#add-btn');
   await dash.fill('#picker-form [name=q]', 'aws');
@@ -184,6 +214,13 @@ try {
   const clipped = await dash.evaluate(() => [...document.querySelectorAll('#picker-list .picker-name')]
     .filter((n) => n.scrollWidth > n.clientWidth || getComputedStyle(n).textOverflow === 'ellipsis').map((n) => n.textContent));
   assert.deepEqual(clipped, []);
+  // 분류 줄은 폰 너비에서 숨은 가로 스크롤 없이 접혀서 모든 분류가 보인다
+  const catsOverflow = await dash.evaluate(() => {
+    const cats = document.querySelector('#picker-cats');
+    const box = cats.getBoundingClientRect();
+    return { scroll: cats.scrollWidth > cats.clientWidth, outside: [...cats.children].filter((b) => b.getBoundingClientRect().right > box.right + 1).length };
+  });
+  assert.deepEqual(catsOverflow, { scroll: false, outside: 0 });
   await dash.click('#picker-cancel');
   await dash.setViewportSize({ width: 1280, height: 900 });
 

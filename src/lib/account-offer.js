@@ -41,11 +41,14 @@
     };
   }
 
-  /** 이미 기록된(해지 안 한) 서비스거나, 30일 안에 거절했으면 안내하지 않는다. */
+  // 한 번 결제(영화 대여 등)·카드 등록은 구독이 있다는 뜻이 아니니 안내를 막지 않는다.
+  const NOT_SUBSCRIPTION = new Set(['one_time', 'card_registered']);
+
+  /** 이미 기록된(해지 안 한) 구독이거나, 30일 안에 거절했으면 안내하지 않는다. */
   function decideOffer(offer, records, dismissed, now = Date.now()) {
     const site = R.SITES.find((s) => s.id === offer.siteId);
     if (!site) return { show: false, reason: 'unknown' };
-    if ((records || []).some((r) => r.status !== 'canceled' && hostMatches(r.site, site.domain))) {
+    if ((records || []).some((r) => r.status !== 'canceled' && !NOT_SUBSCRIPTION.has(r.kind) && hostMatches(r.site, site.domain))) {
       return { show: false, reason: 'exists' };
     }
     const at = dismissed && dismissed[site.id];

@@ -4,7 +4,7 @@
   const L = globalThis.PaymentLedger;
   const S = globalThis.PaymentStore;
   const K = globalThis.PaymentCatalog;
-  const { el, brandAvatar, formatTotals, amountText, kindBadge, formatDate, cloudOverview, toast, radioChip, checkedValue, checkRadio, withFallbackFx, FALLBACK_FX_AS_OF } = globalThis.PaymentUI;
+  const { el, recordAvatar, siteInitial, formatTotals, amountText, kindBadge, formatDate, cloudOverview, toast, radioChip, checkedValue, checkRadio, withFallbackFx } = globalThis.PaymentUI;
   const Q = globalThis.PaymentQuickAdd;
   const $ = (id) => document.getElementById(id);
   const H = globalThis.PaymentHistory;
@@ -49,86 +49,6 @@
   const cloudParts = () => globalThis.PaymentForecast.cloudParts(
     cloudOverview(cloud.costs, cloud.meta), Date.now(), globalThis.PaymentCloudCosts.billingWindow(Date.now()).thisKey);
 
-  function renderHeadline(s, usdKrw) {
-    const cloudNow = cloudParts();
-    const { paidKRW, dueKRW, unconverted } = globalThis.PaymentForecast.monthForecast(s, cloudNow, usdKrw);
-    globalThis.PaymentMotion.countUp($('monthly-total'), paidKRW + dueKRW, (n) => joinMoney(n, unconverted));
-    renderDelta(paidKRW + dueKRW, usdKrw);
-    renderBudget(paidKRW + dueKRW);
-    renderSplit(paidKRW, dueKRW);
-    $('cloud-line').textContent = cloudNow.projected
-      ? `서버·API 지금 ${L.formatMoney(cloudNow.now, 'KRW')} → 월말 예상 ${L.formatMoney(cloudNow.projected, 'KRW')}` : '';
-    $('yearly-total').textContent = Object.keys(s.monthly).length ? `정액 구독 월 평균 ${moneyLine(s.monthly, usdKrw)} · 1년이면 ${moneyLine(s.yearly, usdKrw)}` : '';
-    const rateText = `1달러 ${Math.round(usdKrw).toLocaleString('ko-KR')}원`;
-    const usdNote = s.thisMonth.USD
-      ? `달러 결제 ${L.formatMoney(s.thisMonth.USD, 'USD')} 포함, ${cloud.meta.fxFallback ? `${rateText}(${FALLBACK_FX_AS_OF} 참고 환율 · 실시간 환율을 아직 못 받았어요)` : rateText}` : '';
-    const missing = Object.keys(unconverted).length || cloudNow.hasUnconverted ? '원화로 못 바꾼 금액 제외' : '';
-    $('all-total').textContent = [usdNote, missing].filter(Boolean).join(' · ');
-  }
-
-  // 나간 돈 / 나갈 돈 막대
-  function renderSplit(paidKRW, dueKRW) {
-    const total = paidKRW + dueKRW;
-    $('paid-bar').hidden = total <= 0;
-    $('paid-fill').style.width = total > 0 ? `${Math.round((paidKRW / total) * 100)}%` : '0%';
-    $('paid-bar').setAttribute('aria-label', `나간 돈 ${L.formatMoney(paidKRW, 'KRW')}, 나갈 돈 ${L.formatMoney(dueKRW, 'KRW')}`);
-    $('split-legend').replaceChildren(...(total > 0 ? [
-      el('li', { class: 'is-paid' }, '나간 돈', el('b', {}, L.formatMoney(paidKRW, 'KRW'))),
-      el('li', { class: 'is-due' }, '나갈 돈', el('b', {}, L.formatMoney(dueKRW, 'KRW'))),
-    ] : []));
-  }
-
-  // 지난달 대비. 지난달 = 기록에서 다시 계산한 결제 + 그달 사용료 확정값.
-  function lastMonthKRW(usdKrw) {
-    const [last] = H.monthlyHistory(records, Date.now(), { months: 2, isCovered });
-    const fromRecords = L.krwTotal(last.subscription, usdKrw).krw + L.krwTotal(last.one_time, usdKrw).krw;
-    return fromRecords + H.cloudMonthKRW(cloud.history, last.key, usdKrw).krw;
-  }
-
-  function renderDelta(thisKRW, usdKrw) {
-    const last = lastMonthKRW(usdKrw);
-    const diff = thisKRW - last;
-    const text = !last ? '' : diff === 0 ? '지난달과 같아요'
-      : `지난달(${L.formatMoney(last, 'KRW')})보다 ${L.formatMoney(Math.abs(diff), 'KRW')} ${diff > 0 ? '많아요' : '적어요'}`;
-    $('month-delta').textContent = text;
-    $('month-delta').dataset.trend = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
-  }
-
-  function renderBudget(spent) {
-    const state = ST.budgetState(spent, settings.budgetKRW);
-    $('budget-meter').hidden = !state;
-    $('budget-edit').textContent = state ? '예산 바꾸기' : '예산 정하기';
-    $('budget').dataset.level = state ? state.level : 'none';
-    if (!state) {
-      $('budget-text').textContent = '예산을 정해 두면 얼마나 남았는지, 넘었는지 알려 드려요.';
-      return;
-    }
-    $('budget-fill').style.width = `${Math.min(100, Math.round(state.ratio * 100))}%`;
-    const budget = L.formatMoney(settings.budgetKRW, 'KRW');
-    const label = { ok: '여유 있어요', warn: '⚠ 거의 다 썼어요', over: '⛔ 예산을 넘었어요' }[state.level];
-    $('budget-text').textContent = state.left >= 0
-      ? `${label} · 예산 ${budget} 중 ${Math.round(state.ratio * 100)}% 사용, ${L.formatMoney(state.left, 'KRW')} 남음`
-      : `${label} · 예산 ${budget}보다 ${L.formatMoney(-state.left, 'KRW')} 더 나가요`;
-  }
-
-  // 30일 안 목록이라 연도는 빼고 "12월 14일 (일)"처럼
-  const shortDate = (ts) => new Date(ts).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' });
-
-  const dday = (date) => `D-${L.daysUntil(date, Date.now())}`;
-
-  function renderUpcoming(upcoming, soon) {
-    $('soon-total').textContent = Object.keys(soon).length ? moneyLine(soon, cloud.meta.usdKrw) : '없어요';
-    $('upcoming-list').replaceChildren(...upcoming.map(({ record, date, isTrialEnd }) =>
-      el('li', { class: L.daysUntil(date, Date.now()) <= L.SOON_DAYS ? 'is-soon' : null },
-        el('span', { class: 'when', title: shortDate(date) }, dday(date)),
-        el('span', { class: 'what' }, record.site, el('small', {}, shortDate(date))),
-        isTrialEnd && el('span', { class: 'badge trial' }, '체험 끝'),
-        el('span', { class: 'leader', 'aria-hidden': 'true' }),
-        el('span', { class: 'amount' }, L.formatMoney(record.amount, record.currency)))));
-    $('upcoming-empty').hidden = upcoming.length > 0;
-    globalThis.PaymentMotion.staggerIn($('upcoming-list'));
-  }
-
   // 무료 체험은 감지한 날이 아니라 체험 끝나는 날이 첫 결제일이라, "맞아요"를 눌러도 날짜를 받으러 편집기를 연다.
   function confirmPending(r) {
     if (r.trial) {
@@ -139,42 +59,12 @@
     S.upsertRecord(L.markConfirmed(r)).catch(showError);
   }
 
-  function renderPending(pending) {
-    $('pending').hidden = pending.length === 0;
-    $('pending-count').textContent = String(pending.length);
-    $('pending-list').replaceChildren(...pending.map((r) => el('li', {},
-      el('span', { class: 'what' }, r.site),
-      el('span', { class: 'amount' }, amountText(r)),
-      el('span', { class: 'acts' },
-        el('button', { type: 'button', class: 'link', onclick: () => confirmPending(r) }, r.trial ? '맞아요 · 체험 끝나는 날 넣기' : '맞아요'),
-        el('button', { type: 'button', class: 'link', onclick: () => openEditor(r) }, '고치기'),
-        el('button', { type: 'button', class: 'link', onclick: () => removeRecord(r).catch(showError) }, '아니에요')))));
-  }
-
-  function renderSummary() {
-    const s = summarize();
-    renderHeadline(s, cloud.meta.usdKrw);
-    const stats = [
-      ['사용 중인 구독', `${s.activeSubscriptions}개`],
-      ['이번 달 일회성 결제', formatTotals(s.oneTimeThisMonth)],
-      ['해지로 올해 아낀 돈', formatTotals(s.savedThisYear)],
-      ['결제수단 등록만 한 곳', `${s.cardRegistrations}곳`],
-    ];
-    $('stats').replaceChildren(...stats.map(([k, v]) => el('div', { class: 'stat' }, el('dt', {}, k), el('dd', {}, v))));
-    renderUpcoming(s.upcoming, s.soon);
-    renderPending(s.pending);
-  }
-
   function cardText(r) {
     const card = r.card ? `${r.card.brand} ····${r.card.last4}` : null;
     return [card, r.pg].filter(Boolean).join(' · ') || '—';
   }
 
-  // www. 를 뺀 사이트 이름 첫 글자. 표에서 줄을 눈으로 빨리 찾게 하는 표시일 뿐이다.
-  const siteInitial = (site) => (String(site || '?').replace(/^www\./, '').match(/[\p{L}\p{N}]/u) || ['?'])[0];
-
   function renderRow(r) {
-    const catalogItem = K.findBySite(r.site);
     const isPending = !L.isConfirmed(r);
     const covered = !isPending && isCovered(r);
     const flags = [
@@ -187,7 +77,7 @@
     return el('tr', { class: classes || null },
       el('td', { class: 'site' },
         el('div', { class: 'site-cell' },
-          catalogItem ? brandAvatar(catalogItem, `kind-${r.kind}`) : el('span', { class: `avatar kind-${r.kind}`, 'aria-hidden': 'true' }, siteInitial(r.site)),
+          recordAvatar(r),
           el('span', { class: 'site-name' }, r.site, r.note && el('small', {}, r.note)))),
       el('td', { class: 'kind' }, kindBadge(r), ...flags),
       el('td', { class: 'num' }, amountText(r)),
@@ -214,7 +104,6 @@
   }
 
   function render() {
-    renderSummary();
     renderRows();
     document.dispatchEvent(new Event('records-rendered'));
   }
@@ -401,7 +290,22 @@
     filter = btn.dataset.filter;
     renderRows();
   });
-  $('record-search').addEventListener('input', renderRows);
+  $('record-search').addEventListener('input', () => {
+    $('global-search').value = $('record-search').value;
+    renderRows();
+  });
+  // 위 막대 찾기칸: 기록 화면으로 가서 같은 검색을 건다. '/'를 누르면 찾기칸으로.
+  $('global-search').addEventListener('input', () => {
+    $('record-search').value = $('global-search').value;
+    if (globalThis.PaymentRouter && globalThis.PaymentRouter.current() !== 'records') globalThis.PaymentRouter.go('records');
+    renderRows();
+  });
+  document.addEventListener('keydown', (e) => {
+    const typing = e.target.closest && e.target.closest('input, textarea, select, [contenteditable]');
+    if (e.key !== '/' || typing || document.querySelector('dialog[open]')) return;
+    e.preventDefault();
+    $('global-search').focus();
+  });
   $('editor-form').addEventListener('change', (e) => {
     const { name, value } = e.target;
     if (name === 'cardKey') syncLast4Row();
@@ -425,7 +329,7 @@
     records = next;
     render();
   });
-  S.onCardsChanged((next) => { cards = next; });
+  S.onCardsChanged((next) => { cards = next; render(); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes[ST.KEY]) settings = ST.normalizeSettings(changes[ST.KEY].newValue);
@@ -458,6 +362,13 @@
     getCards: () => cards,
     isCovered,
     cloudView,
+    cloudParts,
+    summarize,
+    joinMoney,
+    moneyLine,
+    confirmPending,
+    removeRecord: (r) => removeRecord(r).catch(showError),
+    showError,
     exportCsv,
   };
 })();

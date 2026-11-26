@@ -44,19 +44,21 @@
   }
 
   /**
-   * @param {{ item: object, planIndex?: number|null, amount?: string|number }[]} selections
+   * 줄마다 card(null이면 카드 없음)·startedAt을 정했으면 그 값을, 정하지 않았으면(undefined) 공통 값을 쓴다.
+   * @param {{ item: object, planIndex?: number|null, amount?: string|number, card?: object|null, startedAt?: number }[]} selections
    * @param {{ card: {brand:string,last4:string}|null, startedAt: number, now?: number }} opts
    */
   function buildRecords(selections, { card, startedAt, now = Date.now() }) {
     if (selections.length > MAX_BATCH) throw new Error(`한 번에 ${MAX_BATCH}개까지 추가할 수 있어요.`);
-    return selections.map(({ item, planIndex = null, amount }, i) => {
+    return selections.map(({ item, planIndex = null, amount, ...own }, i) => {
+      const rowCard = own.card !== undefined ? own.card : card;
       const plan = item.plans && planIndex != null ? item.plans[planIndex] || null : null;
       const fields = K.recordFields(item, plan);
       return L.createRecord({
         ...fields,
         amount: plan ? fields.amount : parseAmount(amount),
-        card: card ? { brand: card.brand || '카드', last4: card.last4 } : null,
-        startedAt,
+        card: rowCard ? { brand: rowCard.brand || '카드', last4: rowCard.last4 } : null,
+        startedAt: Number.isFinite(own.startedAt) ? own.startedAt : startedAt,
         review: 'confirmed',
         userEdited: true,
       }, now + i); // 같은 밀리초에 만들어도 id가 겹치지 않게

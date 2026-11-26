@@ -5,7 +5,7 @@
 
   const L = globalThis.PaymentLedger;
   const H = globalThis.PaymentHistory;
-  const { el } = globalThis.PaymentUI;
+  const { el, recordAvatar, serviceName } = globalThis.PaymentUI;
   const D = () => globalThis.PaymentDashboard;
   const $ = (id) => document.getElementById(id);
   const NS = 'http://www.w3.org/2000/svg';
@@ -178,7 +178,8 @@
     const max = top.length ? top[0].krw : 0;
     $('top-range').textContent = `· 최근 ${months}개월`;
     $('top-list').replaceChildren(...top.map((t) => el('li', {},
-      el('span', { class: 'rank-site' }, t.site),
+      recordAvatar({ site: t.site, kind: 'subscription' }),
+      el('span', { class: 'rank-site' }, serviceName(t.site), serviceName(t.site) !== t.site && el('small', {}, t.site)),
       el('span', { class: 'rank-bar', 'aria-hidden': 'true' }, el('span', { style: `width: ${max ? Math.max(2, Math.round((t.krw / max) * 100)) : 0}%` })),
       el('span', { class: 'rank-amount' }, won(t.krw)))));
     $('top-empty').hidden = top.length > 0;
