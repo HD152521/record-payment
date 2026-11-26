@@ -237,3 +237,13 @@ test('cardSummary 기본 호출(now 생략)도 기존처럼 count·monthly를 �
   assert.equal(c.count, 1);
   assert.deepEqual(c.monthly, { KRW: 10000 });
 });
+
+test('stampChanged는 새로 넣거나 내용이 바뀐 기록에만 새 수정 시각을 찍는다', () => {
+  const { sanitizeRecord, stampChanged } = require('../src/lib/ledger.js');
+  const base = sanitizeRecord({ id: 'a', site: 'a.com', amount: 1, createdAt: 10, startedAt: 10, updatedAt: 10 });
+  assert.equal(stampChanged(base, [base], 500).updatedAt, 10);
+  assert.equal(stampChanged({ ...base, amount: 2 }, [base], 500).updatedAt, 500);
+  assert.equal(stampChanged(base, [], 500).updatedAt, 500);
+  assert.equal(stampChanged({ ...base, updatedAt: 900 }, [], 500).updatedAt, 900);
+  assert.equal(base.updatedAt, 10);
+});

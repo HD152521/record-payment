@@ -1,15 +1,15 @@
 /* 탭별로 결제 흐름을 추적해 하나의 기록으로 합친다.
    결제창 팝업(새 탭)은 원래 탭에 묶어서 "어느 사이트에서 등록했는지"를 유지한다. */
 importScripts(
-  'lib/detect.js', 'lib/account-reader.js', 'lib/ledger.js', 'lib/account-offer.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js', 'lib/onboarding.js',
+  'lib/detect.js', 'lib/account-reader.js', 'lib/ledger.js', 'lib/account-offer.js', 'lib/store.js', 'lib/history.js', 'lib/settings.js', 'lib/reminders.js', 'lib/backup.js', 'lib/onboarding.js', 'lib/sync.js',
   'lib/cloud/config.js', 'lib/cloud/costs.js', 'lib/cloud/sigv4.js',
   'lib/cloud/aws.js', 'lib/cloud/azure.js', 'lib/cloud/openai.js',
   'lib/cloud/cloudflare.js', 'lib/cloud/github.js', 'lib/cloud/vercel.js', 'lib/cloud/service.js',
-  'lib/cloud/autofetch.js', 'lib/cloud/autofetch-watch.js', 'reminder-service.js',
+  'lib/cloud/autofetch.js', 'lib/cloud/autofetch-watch.js', 'reminder-service.js', 'sync-service.js',
 );
 
 const { pgFromHost, isPaymentIntermediary, hostOf } = PaymentTracker;
-const { createRecord, mergeRecord, normalizeCard, upsertCard, sanitizeRecord } = PaymentLedger;
+const { createRecord, mergeRecord, normalizeCard, upsertCard, sanitizeRecord, stampChanged } = PaymentLedger;
 const { loadRecords, saveRecords, loadCards, saveCards } = PaymentStore;
 
 const MERGE_WINDOW_MS = 30 * 60 * 1000;
@@ -27,6 +27,8 @@ function serialize(task) {
   queue = run.catch((err) => console.error('[결제 기록장]', err));
   return run;
 }
+
+const syncService = PaymentSyncService.createSyncService({ serialize });
 
 const tabKey = (id) => `tab:${id}`;
 
@@ -193,7 +195,8 @@ async function handleCardMessage(msg) {
 // 백업 가져오기: 파일 내용은 여기서 다시 검사한다. 같은 id 기록·같은 끝 4자리 카드는 가져온 값으로 바꾼다.
 async function importBackup(text) {
   const parsed = PaymentBackup.parseBackup(text);
-  await saveRecords(PaymentBackup.mergeById(await loadRecords(), parsed.records));
+  const current = await loadRecords();
+  await saveRecords(PaymentBackup.mergeById(current, parsed.records.map((r) => stampChanged(r, current))));
   await saveCards(parsed.cards.reduce(upsertCard, await loadCards()));
   await PaymentSettings.saveSettings(parsed.settings);
   return { ok: true, records: parsed.records.length, cards: parsed.cards.length, skipped: parsed.skipped };
@@ -204,8 +207,11 @@ const MAX_BATCH_WRITE = 50;
 // 대시보드의 수정·삭제도 같은 큐를 거쳐야 감지 기록과 서로 덮어쓰지 않는다.
 async function handleDashboardMessage(msg) {
   if (msg.type.startsWith('cards:')) return handleCardMessage(msg);
+  if (msg.type.startsWith('sync:')) return syncService.handleMessage(msg);
   // 모든 데이터 지우기: 기록·카드·연결 키·받아 둔 사용료(local)와 자동 받기 임시값·탭 상태(session)
   if (msg.type === 'wipe') {
+    // 클라우드 사본부터 지운다. 실패하면 로컬도 지우지 않고 다시 시도하게 한다.
+    await syncService.wipeRemote();
     await PaymentCloudService.handleMessage({ type: 'cloud:wipe' });
     await chrome.storage.local.clear();
     await chrome.storage.session.clear();
@@ -222,14 +228,14 @@ async function handleDashboardMessage(msg) {
   if (msg.type === 'reminders:test') return PaymentReminderService.sendTest();
   const records = await loadRecords();
   if (msg.type === 'upsert' && msg.record && typeof msg.record.id === 'string') {
-    const record = sanitizeRecord(msg.record);
+    const record = stampChanged(sanitizeRecord(msg.record), records);
     const exists = records.some((r) => r.id === record.id);
     await saveRecords(exists ? records.map((r) => (r.id === record.id ? record : r)) : [record, ...records]);
   } else if (msg.type === 'upsertMany' && Array.isArray(msg.records)) {
     // 빠른 추가: 여러 기록을 한 번에 넣는다(되돌리기는 deleteMany). 하나라도 잘못되면 통째로 거절한다.
     if (msg.records.length > MAX_BATCH_WRITE) throw new Error(`한 번에 ${MAX_BATCH_WRITE}개까지 저장할 수 있어요.`);
     if (!msg.records.every((r) => r && typeof r.id === 'string')) throw new Error('기록 형식이 맞지 않아요.');
-    const incoming = msg.records.map(sanitizeRecord);
+    const incoming = msg.records.map((r) => stampChanged(sanitizeRecord(r), records));
     const ids = new Set(incoming.map((r) => r.id));
     await saveRecords([...incoming, ...records.filter((r) => !ids.has(r.id))]);
   } else if (msg.type === 'deleteMany' && Array.isArray(msg.ids)) {
@@ -315,6 +321,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 PaymentCloudService.install();
 PaymentReminderService.install();
+syncService.install();
 PaymentAutofetchWatch.install();
 
 // 설치 직후에만 대시보드를 열어 첫 실행 안내를 보여 준다(업데이트 때는 열지 않는다).

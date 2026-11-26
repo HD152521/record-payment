@@ -263,6 +263,13 @@
     };
   }
 
+  /** 새로 넣거나 내용이 바뀐 기록에 수정 시각을 찍는다. 되돌리기·백업 복원은 예전 시각을 들고 와서, 안 찍으면 동기화에서 진다. */
+  function stampChanged(record, records, now = Date.now()) {
+    const existing = records.find((r) => r.id === record.id);
+    if (existing && JSON.stringify(sanitizeRecord(existing)) === JSON.stringify(record)) return record;
+    return { ...record, updatedAt: Math.max(now, record.updatedAt) };
+  }
+
   const MAX_CARD_LABEL = 30;
   const MAX_CARD_BRAND = 20;
 
@@ -345,7 +352,7 @@
 
   const api = {
     KIND_LABEL, CYCLE_LABEL, createRecord, mergeRecord, monthlyEquivalent,
-    nextChargeDate, summarize, formatMoney, isConfirmed, markConfirmed, toCsv, krwTotal, sanitizeRecord, normalizeCard, upsertCard, cardSummary, unassignedSummary,
+    nextChargeDate, summarize, formatMoney, isConfirmed, markConfirmed, toCsv, krwTotal, sanitizeRecord, stampChanged, normalizeCard, upsertCard, cardSummary, unassignedSummary,
     chargeDates, monthRange, isActiveSubscription, originOnly, daysUntil, SOON_DAYS,
   };
   root.PaymentLedger = api;

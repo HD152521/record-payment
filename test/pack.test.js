@@ -85,3 +85,11 @@ test('보안: manifest는 외부 노출·원격 코드 설정이 없다', () => 
   assert.ok(P.findManifestIssues({ ...manifest, web_accessible_resources: [{ resources: ['*'] }] }).length > 0);
   assert.ok(P.findManifestIssues({ ...manifest, permissions: [...manifest.permissions, 'tabs'] }).length > 0);
 });
+
+test('패키지 zip의 manifest에는 개발용 key가 없다(스토어는 key를 받지 않는다)', () => {
+  assert.ok(manifest.key, '압축해제 설치에서 기기마다 같은 확장 ID를 쓰려면 key가 필요해요');
+  const entry = P.readZip(P.buildPackage(root)).find((e) => e.name === 'manifest.json');
+  const packed = JSON.parse(entry.data.toString('utf8'));
+  assert.equal(packed.key, undefined);
+  assert.deepEqual({ ...packed, key: manifest.key }, manifest);
+});
