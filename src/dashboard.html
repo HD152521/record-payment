@@ -21,6 +21,7 @@
       <a href="#cloud" data-page="cloud">서버·API</a>
       <a href="#cards" data-page="cards">카드</a>
       <a href="#settings" data-page="settings">설정</a>
+      <a href="#help" data-page="help">사용법</a>
     </nav>
     <label class="global-search"><span class="sr-only">서비스·카드 찾기</span><input type="search" id="global-search" placeholder="서비스·카드 찾기" autocomplete="off"><kbd aria-hidden="true">/</kbd></label>
     <button type="button" class="btn" id="add-btn">＋ 추가</button>
@@ -274,7 +275,6 @@
         <label class="btn ghost small file-btn">파일에서 가져오기<input type="file" id="restore-file" accept="application/json,.json" class="sr-only"></label>
       </div>
     </section>
-    <p class="status" id="settings-status" role="status"></p>
 
     <section class="setting" aria-labelledby="sync-h">
       <div>
@@ -298,7 +298,6 @@
       </div>
     </section>
     <section class="setting stmt-panel" id="stmt-panel" aria-live="polite" hidden></section>
-    <p class="status" id="stmt-status" role="status"></p>
 
     <section class="setting data-zone" aria-labelledby="data-h">
       <div>
@@ -309,6 +308,42 @@
         <button type="button" class="btn danger" id="wipe-btn">모든 데이터 지우기</button>
       </div>
     </section>
+  </section>
+
+  <!-- 사용법: 처음 쓰는 사람이 1분 안에 훑는 안내 -->
+  <section class="page settings help" id="page-help" data-page="help" aria-labelledby="help-h" hidden>
+    <h1 id="help-h">사용법</h1>
+
+    <section class="setting"><div>
+      <h2>기본 3단계</h2>
+      <ol>
+        <li><b>담기</b> — 위의 <b>＋ 추가</b>에서 이미 쓰는 구독을 골라요. 크롬에서 새로 결제하면 자동으로 찾기도 해요.</li>
+        <li><b>확인하기</b> — 자동으로 찾은 결제는 <a class="link" href="#home">이번 달</a>의 챙길 일에서 <b>맞아요 · 고치기 · 아니에요</b> 중 하나를 눌러요. <b>맞다고 한 것만 합계에 들어가요.</b></li>
+        <li><b>보기</b> — <a class="link" href="#home">이번 달</a> 나갈 돈, <a class="link" href="#trends">달마다</a> 쓴 돈, <a class="link" href="#cards">카드</a>별 금액을 확인해요.</li>
+      </ol>
+    </div></section>
+
+    <section class="setting"><div>
+      <h2>더 쓸 수 있는 기능</h2>
+      <ul>
+        <li><b>서버·API 사용료</b> — <a class="link" href="#cloud">서버·API</a>에서 읽기 전용 키로 연결해요. AWS는 조회 1번에 $0.01이 내 AWS 계정에 청구돼요.</li>
+        <li><b>예산 · 결제 알림</b> — <a class="link" href="#settings">설정</a>에서 켜요.</li>
+        <li><b>다른 컴퓨터에서 보기</b> — 두 컴퓨터에 설치하고, 크롬 동기화와 설정의 <b>크롬 동기화</b>를 모두 켜요. 서버·API 연결은 컴퓨터마다 따로 해야 해요.</li>
+        <li><b>백업 · 카드 이용내역 가져오기</b> — 설정에서 파일로 받거나 가져와요.</li>
+      </ul>
+    </div></section>
+
+    <section class="setting"><div>
+      <h2>잘 안 될 때</h2>
+      <dl>
+        <dt>결제했는데 기록이 없어요</dt>
+        <dd>설치하거나 새로고침하기 전에 열어 둔 페이지는 새로고침해 주세요. 휴대폰이나 크롬 밖에서 한 결제는 못 찾고, 화면에 따라 놓칠 수 있어요. 그럴 땐 ＋ 추가로 넣어요.</dd>
+        <dt>알림이 안 보여요</dt>
+        <dd>알림 센터(Windows는 <b>Win+N</b>)를 열어 보세요. 방해 금지가 켜져 있거나 화면을 전체로 쓰는 중이면 배너가 안 뜰 수 있어요. Windows는 설정 → 시스템 → 알림에서 Google Chrome이 켜져 있는지도 확인해요.</dd>
+        <dt>다른 컴퓨터에 안 보여요</dt>
+        <dd>두 컴퓨터 모두 같은 계정인지, 크롬 동기화에 확장 프로그램이 포함됐는지 확인하고, 설정의 <b>지금 맞추기</b>를 눌러요. 전달에 시간이 걸릴 수 있어요.</dd>
+      </dl>
+    </div></section>
   </section>
   </main>
 
@@ -404,8 +439,10 @@
     <p class="card-detail-total" id="card-detail-total"></p>
     <p class="muted" id="card-detail-sub"></p>
     <div class="card-assign" id="card-assign" hidden>
-      <label>이 카드로 정하기 <select id="card-assign-pick"></select></label>
+      <span id="card-assign-none">등록한 카드가 아직 없어요.</span>
+      <label id="card-assign-label">이 카드로 정하기 <select id="card-assign-pick"></select></label>
       <button type="button" class="btn small" id="card-assign-btn">정하기</button>
+      <button type="button" class="btn soft small" id="card-assign-add">＋ 카드 등록</button>
     </div>
     <ul class="card-detail-list" id="card-detail-list"></ul>
     <p class="muted" id="card-detail-empty" hidden>이번 달 기록이 없어요.</p>

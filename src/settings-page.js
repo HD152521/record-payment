@@ -2,17 +2,14 @@
 (() => {
   'use strict';
 
-  const { el } = globalThis.PaymentUI;
+  const { el, toast } = globalThis.PaymentUI;
   const ST = globalThis.PaymentSettings;
   const B = globalThis.PaymentBackup;
   const $ = (id) => document.getElementById(id);
   const CONFIRM_WORD = '지우기';
   const MAX_FILE_BYTES = 5_000_000;
 
-  const say = (text, isError = false) => {
-    $('settings-status').textContent = text;
-    $('settings-status').classList.toggle('error', isError);
-  };
+  const say = (text, isError = false) => toast(text, { isError });
   const fail = (err) => {
     console.error('[결제 기록장] 설정', err);
     say(err && err.message ? err.message : '저장하지 못했어요. 다시 시도해 주세요.', true);
@@ -109,7 +106,7 @@
   $('remind-form').addEventListener('change', () => saveRemind().catch(fail));
   $('remind-form').addEventListener('submit', (e) => e.preventDefault());
   $('remind-test').addEventListener('click', () => send({ type: 'reminders:test' })
-    .then(() => say('예시 알림을 보냈어요. 안 보이면 운영체제의 크롬 알림 설정을 확인해 주세요.'))
+    .then(() => say('예시 알림을 보냈어요. 안 보이면 컴퓨터의 알림 센터(Windows는 Win+N)를 열어 보고, 방해 금지와 Chrome 알림 설정을 확인해 주세요.'))
     .catch(fail));
   $('backup-btn').addEventListener('click', () => backup().catch(fail));
   $('restore-file').addEventListener('change', (e) => restore(e).catch(fail));

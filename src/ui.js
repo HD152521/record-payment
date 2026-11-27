@@ -87,6 +87,8 @@
 
   // 화면 아래 짧은 알림. alert·confirm 대신 쓴다. 되돌리기 같은 버튼을 하나 붙일 수 있다.
   const TOAST_MS = 5000;
+  const TOAST_MAX_MS = 12000;
+  const MS_PER_CHAR = 130; // 긴 안내는 다 읽을 수 있게 더 오래 둔다
   let toastTimer = null;
   const isOpen = (host) => host.matches(':popover-open');
 
@@ -119,7 +121,8 @@
     host.replaceChildren(el('div', { class: `toast${isError ? ' is-error' : ''}` }, el('span', {}, message), action));
     if (isOpen(host)) host.hidePopover(); // 새로 연 대화상자보다 위로 다시 올린다
     host.showPopover();
-    toastTimer = setTimeout(dismissToast, action ? TOAST_MS * 2 : TOAST_MS);
+    const readMs = Math.min(TOAST_MAX_MS, Math.max(TOAST_MS, message.length * MS_PER_CHAR));
+    toastTimer = setTimeout(dismissToast, action ? TOAST_MS * 2 : readMs);
   }
 
   // "모든 데이터 지우기"를 다른 탭에서 해도, 이 탭의 "되돌리기"가 지운 기록을 되살리지 않게 닫는다.

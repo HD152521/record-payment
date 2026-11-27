@@ -2,8 +2,8 @@
 (() => {
   'use strict';
 
-  const PAGES = ['home', 'trends', 'records', 'cloud', 'cards', 'settings'];
-  const TITLES = { home: '이번 달', trends: '달마다', records: '기록', cloud: '서버·API', cards: '카드', settings: '설정' };
+  const PAGES = ['home', 'trends', 'records', 'cloud', 'cards', 'settings', 'help'];
+  const TITLES = { home: '이번 달', trends: '달마다', records: '기록', cloud: '서버·API', cards: '카드', settings: '설정', help: '사용법' };
   // 예전 주소(#subscription 같은 필터)로 들어와도 기록 화면을 보여 준다.
   const LEGACY = { subscription: 'records', one_time: 'records', card_registered: 'records', unknown: 'records', all: 'records' };
 

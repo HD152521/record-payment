@@ -182,7 +182,8 @@ dialog .row { display: flex; gap: 12px; }
 /* ── 카드 등록 미리보기 ──────────────────────────────── */
 .card-preview {
   position: relative; display: flex; flex-direction: column; justify-content: space-between;
-  height: 120px; margin: 0 0 18px; padding: 16px 18px; border-radius: 10px; overflow: hidden;
+  /* 실제 카드(85.6×53.98mm) 비율. 시트 너비를 따라 늘리지 않고 가운데에 둔다 */
+  flex: none; width: min(260px, 100%); aspect-ratio: 85.6 / 53.98; margin: 0 auto 18px; padding: 18px 20px; border-radius: 12px; overflow: hidden;
   color: #fff; background: linear-gradient(135deg, #1f2a44 0%, #3a6df0 120%);
   box-shadow: 0 14px 30px -18px rgb(31 42 68 / 0.8);
 }

@@ -3,7 +3,7 @@
 (() => {
   'use strict';
 
-  const { el, amountText } = globalThis.PaymentUI;
+  const { el, amountText, toast } = globalThis.PaymentUI;
   const S = globalThis.PaymentStatement;
   const ST = globalThis.PaymentStore;
   const $ = (id) => document.getElementById(id);
@@ -13,8 +13,7 @@
   let fileText = null; // 열 고르기에 다시 쓰려고 이 화면이 열려 있는 동안만 들고 있는다
 
   const say = (text, isError = false) => {
-    $('stmt-status').textContent = text;
-    $('stmt-status').classList.toggle('error', isError);
+    if (text) toast(text, { isError });
   };
 
   function closePanel() {
@@ -24,7 +23,7 @@
   }
 
   function cancelButton() {
-    return el('button', { type: 'button', class: 'btn ghost small', onclick: () => { closePanel(); say(''); } }, '닫기');
+    return el('button', { type: 'button', class: 'btn ghost small', onclick: () => { closePanel(); } }, '닫기');
   }
 
   // ── 열 고르기(모르는 양식) ────────────────────────────────
@@ -66,6 +65,8 @@
     const parts = [`${res.format ? `${res.format.name} 양식으로 읽었어요. ` : ''}반복 결제 후보 ${built.records.length}개를 찾았어요.`];
     if (built.skippedExisting) parts.push(`이미 있는 ${built.skippedExisting}개는 뺐어요.`);
     if (built.overLimit) parts.push(`한 번에 ${S.MAX_IMPORT}개까지만 넣을 수 있어서 ${built.overLimit}개는 다음에 넣어 주세요.`);
+    // 목록을 보는 동안에도 빠진 줄이 있다는 걸 알 수 있게, 사라지는 토스트가 아니라 여기에 남긴다
+    if (res.skippedRows) parts.push(`읽지 못했거나 취소된 ${res.skippedRows}줄은 건너뛰었어요.`);
     return parts.join(' ');
   }
 
@@ -94,12 +95,10 @@
     const res = S.analyze(fileText, columns);
     if (!res.format && !columns) {
       if (!res.headers.length) return fail(new Error('이용내역 표를 찾지 못했어요. 카드사에서 받은 CSV 파일이 맞는지 확인해 주세요.'));
-      say('');
       return renderColumnPicker(res.headers);
     }
     const [existing, cards] = await Promise.all([ST.loadRecords(), ST.loadCards()]);
     const built = S.buildRecords(res.candidates, { existing, cards });
-    say(res.skippedRows ? `읽지 못했거나 취소된 ${res.skippedRows}줄은 건너뛰었어요.` : '');
     return renderCandidates(res, built);
   }
 

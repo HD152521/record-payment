@@ -13,6 +13,7 @@
   const dash = () => globalThis.PaymentDashboard;
   const NONE = '__none'; // 카드 안 정한 기록을 보는 상세
   let detailKey = null;
+  let justAddedLast4 = null; // 방금 등록한 카드는 "이 카드로 정하기"에서 바로 골라 둔다
 
   // 이번 달 합계(원화). 환율이 없어 못 바꾼 금액은 따로 붙인다.
   function money(byCurrency) {
@@ -46,10 +47,16 @@
     $('card-unassigned-text').textContent = `카드 안 정한 기록 ${none.count}개 · 이번 달 ${money(none.thisMonth)}`;
   }
 
-  function recordRow(r, withCheck) {
+  // 목록을 다시 그려도(카드를 새로 등록했을 때 등) 사용자가 뺀 기록은 빠진 채로 둔다
+  const uncheckedIds = () => new Set([...$('card-detail-list').querySelectorAll('input:not(:checked)')]
+    .map((input) => input.closest('li').dataset.id));
+
+  function recordRow(r, withCheck, excluded) {
     const when = r.kind === 'one_time' ? `${mdText(r.startedAt)} 결제` : (L.nextChargeDate(r) ? `다음 ${mdText(L.nextChargeDate(r))}` : '');
+    const box = withCheck ? el('input', { type: 'checkbox', 'aria-label': `${r.site} 선택` }) : null;
+    if (box) box.checked = !excluded.has(r.id);
     return el('li', { 'data-id': r.id },
-      withCheck ? el('input', { type: 'checkbox', checked: true, 'aria-label': `${r.site} 선택` }) : null,
+      box,
       el('span', { class: 'card-label' }, r.site),
       el('span', { class: 'muted card-meta' }, `${L.KIND_LABEL[r.kind] || ''} ${when}`.trim()),
       el('span', { class: 'amount' }, L.formatMoney(r.amount, r.currency)));
@@ -57,9 +64,12 @@
 
   function fillAssign(list) {
     const pick = $('card-assign-pick');
+    const wanted = justAddedLast4 || pick.value;
     pick.replaceChildren(...list.map((c) => el('option', { value: c.last4 }, c.label.includes(c.last4) ? c.label : `${c.label} ····${c.last4}`)));
-    $('card-assign-btn').disabled = list.length === 0;
-    if (!list.length) pick.replaceChildren(el('option', { value: '' }, '먼저 카드를 등록해 주세요'));
+    if (list.some((c) => c.last4 === wanted)) pick.value = wanted;
+    $('card-assign-none').hidden = list.length > 0;
+    $('card-assign-label').hidden = list.length === 0;
+    $('card-assign-btn').hidden = list.length === 0;
   }
 
   function renderDetail() {
@@ -74,12 +84,15 @@
     $('card-detail-sub').textContent = `나간 돈 ${money(part.paid)} · 나갈 돈 ${money(part.due)}${part.nextCharge ? ` · 다음 결제일 ${mdText(part.nextCharge)}` : ''}`;
     $('card-assign').hidden = !isNone;
     if (isNone) fillAssign(list);
-    $('card-detail-list').replaceChildren(...part.records.map((r) => recordRow(r, isNone)));
+    const excluded = uncheckedIds();
+    $('card-detail-list').replaceChildren(...part.records.map((r) => recordRow(r, isNone, excluded)));
     $('card-detail-empty').hidden = part.records.length > 0;
   }
 
   function openDetail(key) {
     detailKey = key;
+    justAddedLast4 = null;
+    $('card-detail-list').replaceChildren(); // 새로 연 창은 전부 고른 상태로 시작한다
     renderDetail();
     if (detailKey && !$('card-detail').open) $('card-detail').showModal();
   }
@@ -130,6 +143,7 @@
     const f = $('card-form');
     if (!f.reportValidity()) return;
     const card = { label: f.elements.label.value, brand: checkedValue(f, 'brand') || DEFAULT_BRAND, last4: f.elements.last4.value.trim() };
+    justAddedLast4 = card.last4;
     await S.saveCard(card);
     $('card-dialog').close();
     toast(`····${card.last4} 카드를 등록했어요. 이제 추가할 때 고르기만 하면 돼요.`);
@@ -154,6 +168,8 @@
   $('card-detail').addEventListener('close', () => { detailKey = null; });
   $('card-assign-btn').addEventListener('click', () => assignChecked().catch(fail));
   $('card-add').addEventListener('click', () => openCardDialog());
+  $('card-assign-add').addEventListener('click', () => openCardDialog());
+  $('card-assign-pick').addEventListener('change', () => { justAddedLast4 = null; });
   $('card-cancel').addEventListener('click', () => $('card-dialog').close());
   $('card-form').addEventListener('input', syncPreview);
   $('card-form').addEventListener('submit', (e) => submitCard(e).catch(fail));

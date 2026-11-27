@@ -65,6 +65,42 @@ try {
   await dash.click('#card-detail-close');
   assert.match(await dash.textContent('#card-list li'), /이번 달 47,400원/);
 
+  // 등록한 카드가 하나도 없을 때: 그 창에서 바로 카드를 등록하고 이어서 정한다
+  await worker.evaluate(() => chrome.storage.local.get('records').then((s) => chrome.storage.local.set({ cards: [], records: s.records.map((r) => ({ ...r, card: null })) })));
+  await dash.waitForFunction(() => !document.querySelector('#card-unassigned').hidden && document.querySelectorAll('#card-list li').length === 0);
+  await dash.click('#card-unassigned-btn');
+  await dash.waitForSelector('#card-detail[open]');
+  assert.equal(await dash.isVisible('#card-assign-pick'), false, '고를 카드가 없으면 빈 드롭다운은 숨긴다');
+  assert.equal(await dash.isVisible('#card-assign-btn'), false);
+  await dash.screenshot({ path: path.join(ROOT, 'e2e', 'screenshots', 'card-assign-empty.png') });
+  await dash.uncheck('#card-detail-list li[data-id="b"] input');
+  await dash.click('#card-assign-add');
+  await dash.waitForSelector('#card-dialog[open]');
+
+  // 카드 미리보기는 넓은 화면과 폰 너비 모두에서 실제 카드 비율(85.6×53.98mm)이다
+  for (const width of [1280, 360]) {
+    await dash.setViewportSize({ width, height: 900 });
+    const box = await dash.$eval('.card-preview', (n) => ({ w: n.offsetWidth, h: n.offsetHeight }));
+    assert.ok(Math.abs(box.w / box.h - 85.6 / 53.98) < 0.03, `${width}px에서 카드 비율이 ${(box.w / box.h).toFixed(2)}:1`);
+    await dash.screenshot({ path: path.join(ROOT, 'e2e', 'screenshots', `card-dialog-${width}.png`) });
+  }
+  await dash.setViewportSize({ width: 1280, height: 900 });
+  await dash.fill('#card-form [name=last4]', '1234');
+  await dash.click('#card-form button[type=submit]');
+  await dash.waitForFunction(() => document.querySelector('#card-assign-pick').value === '1234');
+  assert.equal(await dash.isVisible('#card-detail'), true, '등록한 뒤에도 정하던 창이 그대로다');
+  assert.equal(await dash.isVisible('#card-assign-add'), true, '카드가 있어도 새 카드를 더 등록할 수 있다');
+  assert.equal(await dash.isChecked('#card-detail-list li[data-id="b"] input'), false, '카드를 등록해도 뺀 기록은 빠진 채다');
+  await dash.click('#card-assign-btn');
+  await dash.waitForFunction(() => document.querySelectorAll('#card-detail-list li').length === 1);
+  const left = await worker.evaluate(() => chrome.storage.local.get('records').then((s) => s.records.filter((r) => !r.card).map((r) => r.id)));
+  assert.deepEqual(left, ['b']);
+  // 창을 새로 열면 다시 전부 고른 상태로 시작한다
+  await dash.click('#card-detail-close');
+  await dash.click('#card-unassigned-btn');
+  await dash.waitForSelector('#card-detail[open]');
+  assert.equal(await dash.isChecked('#card-detail-list li[data-id="b"] input'), true);
+
   assert.deepEqual(errors, []);
   process.stdout.write('cardsum e2e ok\n');
 } finally {

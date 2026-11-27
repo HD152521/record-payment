@@ -52,6 +52,10 @@
 
   // 설정 화면의 "알림 미리 보기": 알림이 실제로 뜨는지(운영체제가 막지 않는지) 확인용
   async function sendTest() {
+    // 크롬이 막은 경우에도 create는 성공해서, 먼저 확인하지 않으면 "보냈어요"라고 잘못 알려 준다.
+    if ((await chrome.notifications.getPermissionLevel()) === 'denied') {
+      throw new Error('크롬에서 이 확장의 알림이 막혀 있어요. 크롬과 컴퓨터의 알림 설정을 확인해 주세요.');
+    }
     await notify({ key: `test-${Date.now()}`, title: '내일 결제돼요', message: '예시) netflix.com 13,500원 — 알림이 이렇게 떠요.' });
     return { ok: true };
   }

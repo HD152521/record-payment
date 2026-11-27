@@ -100,20 +100,31 @@ try {
   await dash.click('#trend-view button[data-view=all]');
   await dash.waitForFunction(() => document.querySelectorAll('#trend-legend li').length === 3);
 
+  // 2-c) 사용법 화면: 탭으로 열리고, 안에서 설정 화면으로 갈 수 있다
+  await dash.click('#tabs a[data-page=help]');
+  await dash.waitForSelector('#page-help', { state: 'visible' });
+  assert.equal(await dash.isVisible('#page-trends'), false);
+  assert.match(await dash.textContent('#page-help'), /맞아요.*알림이 안 보여요/s);
+  await dash.screenshot({ path: path.join(SHOT_DIR, 'help.png'), fullPage: true });
+  await dash.click('#page-help a[href="#settings"]');
+  await dash.waitForSelector('#page-settings', { state: 'visible' });
+
   // 3) 예산: 이번 달 13,500원인데 예산 10,000원이면 초과
   await dash.click('#tabs a[data-page=settings]');
   await dash.fill('#budget-form [name=budget]', '10000');
   await dash.click('#budget-form button[type=submit]');
-  await dash.waitForFunction(() => /10,000원/.test(document.querySelector('#settings-status').textContent));
+  await dash.waitForFunction(() => /10,000원/.test((document.querySelector('#toaster')?.textContent || '')));
   await dash.click('#tabs a[data-page=home]');
   await dash.waitForFunction(() => document.querySelector('#budget').dataset.level === 'over');
   assert.match(await dash.textContent('#budget-text'), /예산을 넘었어요.*3,500원 더/);
+
+  assert.equal(await dash.isVisible('#sync-now'), false, '동기화를 안 켰으면 "지금 맞추기"는 숨긴다');
 
   // 4) 결제 알림 켜기 → 설정에 저장된다
   await dash.click('#tabs a[data-page=settings]');
   await dash.selectOption('#remind-form [name=daysBefore]', '3');
   await dash.check('#remind-form [name=enabled]');
-  await dash.waitForFunction(() => /알림을 켰어요/.test(document.querySelector('#settings-status').textContent));
+  await dash.waitForFunction(() => /알림을 켰어요/.test((document.querySelector('#toaster')?.textContent || '')));
   const settings = await worker.evaluate(() => chrome.storage.local.get('settings').then((s) => s.settings));
   assert.deepEqual({ budgetKRW: settings.budgetKRW, remind: settings.remind }, { budgetKRW: 10000, remind: { enabled: true, daysBefore: 3 } });
 
@@ -127,9 +138,10 @@ try {
   await worker.evaluate(() => chrome.storage.local.set({ records: [] }));
   dash.once('dialog', (d) => d.accept());
   await dash.setInputFiles('#restore-file', file);
-  await dash.waitForFunction(() => /기록 3개/.test(document.querySelector('#settings-status').textContent));
+  await dash.waitForFunction(() => /기록 3개/.test((document.querySelector('#toaster')?.textContent || '')));
   const restored = await worker.evaluate(() => chrome.storage.local.get('records').then((s) => s.records.map((r) => r.id).sort()));
   assert.deepEqual(restored, ['macbook', 'netflix', 'pending']);
+  assert.equal(await dash.evaluate(() => document.querySelector('#toaster').matches(':popover-open')), true, '안내는 토스트로 뜬다');
   await dash.screenshot({ path: path.join(SHOT_DIR, 'settings.png'), fullPage: true });
 
   // 6) 기록 화면 검색
